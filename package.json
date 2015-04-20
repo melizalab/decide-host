@@ -1,0 +1,44 @@
+{
+    "name": "decide",
+    "preferGlobal": false,
+    "version": "1.1.0",
+    "author": "Meliza Lab (http://meliza.org/starboard)",
+    "description": "operant control system",
+    "contributors": [
+        "Tyler Robbins <tdr5wc -at- virginia.edu",
+        "Dan Meliza <cdm8j -at- virginia.edu>"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/melizalab/decide.git"
+    },
+    "license": "BSD",
+    "dependencies": {
+        "express": "4.4.5",
+        "mongodb": "^1.4.17",
+        "glob": "^4.0.3",
+        "nodemailer": "1.0.3",
+        "npm": ">= 1.1.2",
+        "queue-async": "1.0.7",
+        "socket.io": "1.0.5",
+        "socket.io-client": "1.0.5",
+        "suncalc": "^1.5.2",
+        "underscore": "^1.6.0",
+        "winston": "0.7.3",
+        "yargs": "^1.3.1",
+        "bindings": "~1.2.1"
+    },
+    "devDependencies": {},
+    "optionalDependencies": {},
+    "engines": {
+        "node": "0.10"
+    },
+    "bin": {
+        "decide-ctrl": "scripts/decide-ctrl.js",
+        "decide-host": "scripts/decide-host.js",
+        "lights": "scripts/lights.js",
+        "shape": "scripts/shape.js",
+        "gng": "scripts/gng.js"
+    },
+    "homepage": "http://meliza.org/starboard"
+}

@@ -1,0 +1,15 @@
+{
+    "addr_int": "192.168.10.1",
+    "port_int": 8010,
+    "addr_ext": "localhost",
+    "port_ext": 8020,
+    "port_ctrl": 8000,
+    "standalone": false,
+    "admins": ["dmeliza@gmail.com"],
+    "log_local_trials": true,
+    "log_local_events": false,
+    "log_db": "mongodb://localhost:27017/decide",
+    "send_emails": true,
+    "heartbeat_interval": 3600000,
+    "mail_transport": { "host": "192.168.10.1", "port": 25}
+}

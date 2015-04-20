@@ -1,0 +1,13 @@
+pom.xml
+*jar
+/classes/
+/out/
+/target/
+.lein-deps-sum
+.lein-repl-history
+.lein-plugins/
+/node_modules/
+*.jsonl
+/.DS_Store
+/attic/
+/.nrepl-port
