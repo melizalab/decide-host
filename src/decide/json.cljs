@@ -1,12 +1,13 @@
 (ns decide.json
   "Functions for writing records to newline-delimited JSON format"
-  (:require [cljs.nodejs :as node]))
+  (:require [cljs.nodejs :as node]
+            [shodan.console :as console :include-macros true]))
 
 (def fs (js/require "fs"))
 (def console (js/require "winston"))
 
 (defn- write-stream [path]
-  (.info console "opened" path "for logging")
+  (console/info "opened" path "for logging")
   (.createWriteStream fs path (clj->js {:flags "a" :encoding "utf-8"})))
 
 (def logfiles (atom {}))

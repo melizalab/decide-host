@@ -2,7 +2,7 @@
 
 Many experimenters will eventually want to scale up to multiple devices so they can run several experiments in parallel. `decide` was written with this model in mind. Each BBB runs independently, providing a high degree of fault tolerance, but multiple devices can all be connected in a private network with a host computer that acts as a gateway. Scaling up is as simple as configuring another device, giving it a unique hostname, and connecting it to your network.
 
-The `decide` software running on each device communicates with a process running on the host computer, which provides some additional services, including trial and event logging, collating statistics, monitoring connected devices for errors, and providing an overview interface for all the connected devices. If you are concerned about security (which you should be, if you want to access your experiments over a public network), this configuration provides a single access point that can be more efficiently secured than a host of individual Beaglebones.
+The `decide` software running on each device communicates with `decide-host`, a process running on the host computer, which provides some additional services, including trial and event logging, collating statistics, monitoring connected devices for errors, and providing an overview interface for all the connected devices. If you are concerned about security (which you should be, if you want to access your experiments over a public network), this configuration provides a single access point that can be more efficiently secured than a host of individual Beaglebones.
 
 We assume that you've connected all your devices to a private switch, and that your host computer has two Ethernet interfaces. For the purposes of this document, `eth0` on the host is connected to the outside world, and `eth1` is connected to the private network, which is on the subnet `192.168.10/24`. All the BBBs are also connected to this network through their Ethernet cables (wireless networks are not recommended due to their insecurity and unreliability). No additional configuration of the BBBs is needed for this configuration, beyond ensuring that each device has a unique hostname.
 
@@ -30,7 +30,7 @@ Devices connecting to the private network need to be assigned IP addresses and h
 
 ## Host daemon
 
-The program that handles communication with devices on the network is called `decide-host.js` and runs in `node`, although it's written in [Clojurescript](https://github.com/clojure/clojurescript), which gets compiled to Javascript.
+The program that handles communication with devices on the network is called `decide-host.js` and runs in `node`, although it's written
 
 For debugging and testing purposes the script can be run directly, but for deployment it should be run as a daemon so that it's always available.  These instructions assume `systemd` is being used for service management.
 

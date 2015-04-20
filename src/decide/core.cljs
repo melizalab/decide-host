@@ -1,11 +1,11 @@
 (ns decide.core
   (:require [decide.json :as json]
             [goog.string :as gstring]
-            [goog.string.format]))
+            [goog.string.format]
+            [shodan.console :as console :include-macros true]))
 
 (def os (js/require "os"))
 (def path (js/require "path"))
-(def console (js/require "../lib/log"))
 (def version (aget (js/require "../package.json") "version"))
 
 (defn config-path [name] (.resolve path js/__dirname ".." "config" name))
@@ -18,8 +18,8 @@
                             "subject" subject
                             "text" message)
              (fn [err info]
-               (.debug console "sent email to" to)
-               (when err (.error console "unable to send email:" err)))))
+               (console/log "sent email to" to)
+               (when err (console/error "unable to send email:" err)))))
 
 (defn format [fmt & args]
   (apply gstring/format fmt args))

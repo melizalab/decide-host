@@ -1,9 +1,10 @@
 (ns decide.host
   "Host server; brokers messages from controllers, logs data, and monitors health"
-  (:use [decide.core :only [version config mail console]])
+  (:use [decide.core :only [version config mail]])
   (:require [decide.json :as json]
             [decide.mongo :as mongo]
             [cljs.nodejs :as node]
+            [shodan.console :as console :include-macros true]
             [clojure.string :as str]))
 
 (def Date (js* "Date"))
@@ -52,11 +53,11 @@
   [user & args]
   (let [msg (apply str args)
         to (str/join ", " (keep identity (conj (:admins config) user)))]
-    (.error console msg "- sending email to" to)
+    (console/error msg "- sending email to" to)
     (mail "decide-host" to "error!" msg)))
 
 (defn- log-callback [err msg]
-  (when err (.error console "unable to write record to database" err)))
+  (when err (console/error "unable to write record to database" err)))
 
 (defn- log-event!
   "Logs msg to the event log and (if connected) the event database"
@@ -82,7 +83,7 @@
           data {:program (:program msg)
                 :controller (first (addr-parts msg))
                 :running true}
-          log-it #(.info console "%s: %s %s on %s"
+          log-it #(console/info "%s: %s %s on %s"
                          subject comment (:program data) (:controller data))
           do-it #(mongo/update! @subjs {:_id subject} % log-callback)]
       (case comment
@@ -104,10 +105,10 @@
   ;; running process
   (when-let [[controller component] (addr-parts msg)]
     (when (and @subjs (= component "experiment") (nil? (:procedure msg)))
-      (.debug console "experiment stopped on" controller)
+      (console/log "experiment stopped on" controller)
       (mongo/find-one @subjs {:controller controller}
                       (fn [result]
-                        (.debug console (:_id result) "on" controller "running:" (:running result))
+                        (console/log (:_id result) "on" controller "running:" (:running result))
                         (when (:running result)
                           (error-email (:user result)
                                        (:program result) " quit running running unxpectedly on " controller)
@@ -132,7 +133,7 @@
   "Unregisters a controller. Returns the new controller's value if successful; nil if not"
   [name]
   (when-let [data (get @controllers name)]
-    (.info console "%s unregistered as" (data :address) name)
+    (console/info "%s unregistered as" (data :address) name)
     (swap! controllers dissoc name)
     (state-changed "_controllers" (list-controllers))))
 
@@ -142,7 +143,7 @@
   (let [address (or (aget socket "handshake" "headers" "x-forwarded-for")
                     (aget socket "request" "connection" "remoteAddress"))
         key (atom nil)]
-    (.info console "connection on internal port from" address)
+    (console/info "connection on internal port from" address)
     (-> socket
         (.on "route"
          (fn [msg rep]
@@ -155,7 +156,7 @@
                       (reset! key from)
                       (swap! controllers assoc from {:address address :socket socket})
                       (state-changed "_controllers" (list-controllers))
-                      (.info console "%s registered as" address from)
+                      (console/info "%s registered as" address from)
                       (rep "ok"))))))
         (.on "unroute"
              (fn [msg rep]
@@ -164,7 +165,7 @@
                (rep "ok")))
         (.on "disconnect"
          (fn []
-           (.info console "disconnection from internal port by" address)
+           (console/info "disconnection from internal port by" address)
            (when (remove-controller! @key)
              (if @subjs
                (mongo/find-one @subjs {:controller @key}
@@ -177,14 +178,12 @@
              (reset! key nil))))
         (.on "state-changed"
          (fn [msg]
-           #_(.log console "pub" "state-changed" msg)
            (.emit @io-external "state-changed" msg)
            (let [msg (flatten-record msg :time :addr)]
              (log-event! msg)
              (check-event msg))))
         (.on "trial-data"
          (fn [msg]
-           (.log console "pub" "trial-data" msg)
            (.emit @io-external "trial-data" msg)
            (let [msg (flatten-record msg :time :addr)]
              (log-trial! msg)
@@ -196,13 +195,13 @@
   [socket]
   (let [address (or (aget socket "handshake" "headers" "x-forwarded-for")
                     (aget socket "request" "connection" "remoteAddress"))]
-    (.info console "connection on external port from" address)
+    (console/info "connection on external port from" address)
     ;; all req messages get routed
     (map #(.on socket % (route-req %))
          ["change-state" "reset-state" "get-state" "get-meta" "get-params"])
     ;; TODO route external clients? - do they need to be addressed?
     (.on socket "disconnect"
-         #(.info console "disconnection from external port by" address))))
+         #(console/info "disconnection from external port by" address))))
 
 ;;; HTTP/sockets servers
 (defn server []
@@ -214,12 +213,12 @@
     (.on server-external "listening"
          (fn []
            (let [address (.address server-external)]
-             (.info console "external endpoint is http://%s:%s" (.-address address)
+             (console/info "external endpoint is http://%s:%s" (.-address address)
                     (.-port address)))))
     (.on server-internal "listening"
          (fn []
            (let [address (.address server-internal)]
-             (.info console "internal endpoint is http://%s:%s" (.-address address)
+             (console/info "internal endpoint is http://%s:%s" (.-address address)
                     (.-port address)))))
     (.on @io-internal "connection" connect-internal)
     (.on @io-external "connection" connect-external)
@@ -246,17 +245,15 @@
     (.get "/trials/:subject" send-trials)
     (.use "/static" ((aget express "static") (str __dirname "/../static"))))
 
-
-
 (defn- main [& args]
-  (.info console "this is decide-host, version" version)
+  (console/info "this is decide-host, version" version)
   (when-let [mongo-uri (:log_db config)]
     (mongo/connect mongo-uri
                    (fn [err db]
                      (if err
-                       (.error console "unable to connect to log database at " mongo-uri)
+                       (console/error "unable to connect to log database at " mongo-uri)
                        (do
-                         (.info console "connected to mongodb for logging")
+                         (console/info "connected to mongodb for logging")
                          (reset! events (mongo/collection db "events"))
                          (reset! trials (mongo/collection db "trials"))
                          (reset! subjs (mongo/collection db "subjects"))))
