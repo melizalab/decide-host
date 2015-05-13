@@ -205,25 +205,25 @@
 
 ;;; HTTP/sockets servers
 (defn server []
-  (let [server-internal (.createServer http (express))
-        server-external (.createServer http app)]
-    (reset! io-internal (sock-io server-internal))
-    (reset! io-external (sock-io server-external))
+  (let [http-internal (.createServer http (express))
+        http-external (.createServer http app)]
+    (reset! io-internal (sock-io http-internal))
+    (reset! io-external (sock-io http-external))
     (.enable app "trust proxy")
-    (.on server-external "listening"
+    (.on http-external "listening"
          (fn []
-           (let [address (.address server-external)]
+           (let [address (.address http-external)]
              (console/info "external endpoint is http://%s:%s" (.-address address)
                     (.-port address)))))
-    (.on server-internal "listening"
+    (.on http-internal "listening"
          (fn []
-           (let [address (.address server-internal)]
+           (let [address (.address http-internal)]
              (console/info "internal endpoint is http://%s:%s" (.-address address)
                     (.-port address)))))
     (.on @io-internal "connection" connect-internal)
     (.on @io-external "connection" connect-external)
-    (.listen server-external (:port_ext config) (:addr_ext config))
-    (.listen server-internal (:port_int config) (:addr_int config))))
+    (.listen http-external (:port_ext config) (:addr_ext config))
+    (.listen http-internal (:port_int config) (:addr_int config))))
 
 ;; HTTP methods
 (defn- send-trials
@@ -251,7 +251,7 @@
     (mongo/connect mongo-uri
                    (fn [err db]
                      (if err
-                       (console/error "unable to connect to log database at " mongo-uri)
+                       (console/warn "unable to connect to log database at " mongo-uri)
                        (do
                          (console/info "connected to mongodb for logging")
                          (reset! events (mongo/collection db "events"))
