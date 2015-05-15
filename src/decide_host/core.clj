@@ -13,14 +13,13 @@
 (def zmq-out (async/chan (async/sliding-buffer 64)))
 
 (defn to-string [x] (when-not (nil? x) (String. x)))
-
-(defn decode-pub [bytes] (json/parse-string (to-string bytes)))
+(defn bad-message [msg] (println "E: bad message:" msg))
 
 (defn connect!
   "Registers a controller as connected. Returns true if successful, nil if the address is taken"
   [sock-id ctrl-addr]
   (let [controller (db/get-controller-by-addr ctrl-addr)]
-    (when (or (nil? controller) (not (:alive controller)))
+    (when 1 ;(or (nil? controller) (not (:alive controller)))
       (println "I:" ctrl-addr "connected")
       (db/add-controller! sock-id ctrl-addr))))
 
@@ -33,6 +32,7 @@
 (defn connection-error!
   [controller]
   (println "E: controller" (:_id controller) "disconnected unexpectedly")
+  ;; TODO notify user
   (db/controller-alive! (:zmq-id controller) false))
 
 (defn check-connection
@@ -44,32 +44,50 @@
        (> interval (* heartbeat-maxcount heartbeat-ms)) (connection-error! controller)
        (> interval heartbeat-ms) (async/put! zmq-in [zmq-id "HUGZ"]))))
 
-(defn bad-message [msg] (println "E: bad message:" msg))
+(defn decode-pub
+  "Decodes payload of a PUB message, returning nil on errors"
+  [bytes]
+  (try
+    (json/parse-string (to-string bytes) true)
+    (catch Exception e nil)))
+
+(defn store-event!
+  [id data]
+  (println "D:" id "state-changed:" data)
+  (async/put! zmq-in [id "ACK" "hash"]))
+
+(defn store-trial!
+  [id data]
+  (println "D:" id "trial-data:" data)
+  (async/put! zmq-in [id "ACK" "trial-hash"]))
 
 ;;; the zmq message handling loop
-(async/go-loop [[id & msg] (<! zmq-out)]
-  (when-let [id (String. id)]
-    (case (to-string (first msg))
-      "OHAI" (let [ctrl-addr (to-string (second msg))]
+(async/go-loop [[id mtype & data] (<! zmq-out)]
+  (when-let [id (to-string id)]
+    (case (to-string mtype)
+      "OHAI" (when-let [ctrl-addr (to-string (first data))]
                (let [out-msg (if (connect! id ctrl-addr) "OHAI-OK" "WTF")]
                  (>! zmq-in [id out-msg])))
-      "PUB" (let [data (decode-pub (second msg))]
-              (println "PUB" data)
+      "PUB" (when-let [data-type (to-string (first data))]
               (db/controller-alive! id)
-              (>! zmq-in [id "ACK" "insert-hash-here"]))
+              (when-let [payload (decode-pub (second data))]
+                (case data-type
+                  "state-changed" (store-event! id payload)
+                  "trial-data" (store-trial! id payload)
+                  (bad-message data-type))))
       "HUGZ" (do
                (db/controller-alive! id)
                (>! zmq-in [id "HUGZ-OK"]))
       "HUGZ-OK" (db/controller-alive! id)
       "BYE" (disconnect! id)
-      (bad-message msg)))
+      (bad-message mtype)))
   (recur (<! zmq-out)))
 
 
 (defn start-zmq-server [addr]
   (register-socket! {:in zmq-in :out zmq-out :socket-type :router
                      :configurator (fn [socket] (.bind socket addr))})
-  (async/go-loop []
+  #_(async/go-loop []
     (<! (async/timeout (config :heartbeat-ms)))
     (dorun (map check-connection (db/get-living-controllers)))
     (recur)))

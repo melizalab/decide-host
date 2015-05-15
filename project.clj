@@ -17,5 +17,5 @@
 
   :main ^:skip-aot decide-host.core
   :target-path "target/%s"
-  :profiles {:uberjar {:aot :all}}
-  )
+  :profiles {:uberjar {:aot :all}
+             :dev {:dependencies [[midje "1.5.1"]]}})
