@@ -12,6 +12,7 @@
 
                  [com.novemberain/monger "2.0.0"]
                  [com.keminglabs/zmq-async "0.1.0"]
+                 [digest "1.4.4"]
                  [cheshire "5.4.0"]
                  [clj-time "0.8.0"]]
 

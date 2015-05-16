@@ -5,6 +5,7 @@
             [clojure.core.async :as async :refer [>! <! >!! <!!]]
             [clojure.core.match :refer [match]]
             [clj-time.core :as t]
+            [digest]
             [cheshire.core :as json]))
 
 (def config (json/parse-string (slurp "config/host-config.json") true))
@@ -54,12 +55,21 @@
 (defn store-event!
   [id data]
   (println "D:" id "state-changed:" data)
-  (async/put! zmq-in [id "ACK" "hash"]))
+  true)
 
 (defn store-trial!
   [id data]
   (println "D:" id "trial-data:" data)
-  (async/put! zmq-in [id "ACK" "trial-hash"]))
+  true)
+
+(defn store-data!
+  [id data-type data]
+  (when-let [address (:_id (db/get-controller-by-socket id))]
+    (when-let [payload (decode-pub data)]
+      (case data-type
+        "state-changed" (store-event! id payload)
+        "trial-data" (store-trial! id payload)
+        (bad-message data-type)))))
 
 ;;; the zmq message handling loop
 (async/go-loop [[id mtype & data] (<! zmq-out)]
@@ -68,13 +78,10 @@
       "OHAI" (when-let [ctrl-addr (to-string (first data))]
                (let [out-msg (if (connect! id ctrl-addr) "OHAI-OK" "WTF")]
                  (>! zmq-in [id out-msg])))
-      "PUB" (when-let [data-type (to-string (first data))]
+      "PUB" (let [[data-type payload] (map to-string data)]
               (db/controller-alive! id)
-              (when-let [payload (decode-pub (second data))]
-                (case data-type
-                  "state-changed" (store-event! id payload)
-                  "trial-data" (store-trial! id payload)
-                  (bad-message data-type))))
+              (when-not (nil? (store-data! id data-type payload))
+                (async/put! zmq-in [id "ACK" (digest/md5 payload)])))
       "HUGZ" (do
                (db/controller-alive! id)
                (>! zmq-in [id "HUGZ-OK"]))
