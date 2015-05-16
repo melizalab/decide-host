@@ -2,8 +2,9 @@
   (:require [monger.joda-time]
             [monger.core :as mg]
             [monger.collection :as mc]
-            [clj-time.core :as t]
-            [monger.operators :refer :all])
+            [monger.result :refer [ok?]]
+            [monger.operators :refer :all]
+            [clj-time.core :as t])
   (:import [com.mongodb MongoOptions ServerAddress]))
 
 ;; collection names
@@ -35,6 +36,16 @@
 
 (defn get-living-controllers [] (mc/find-maps db ctrl-coll {:alive true}))
 
-(defn log-event!
-  "Inserts an event into the database, returning true on success"
-  [db data])
+(defn start-subject!
+  [subject data]
+  (mc/update db subj-coll {:_id subject} {$set data} {:upsert true}))
+
+(defn stop-subject!
+  [addr]
+  (mc/update db subj-coll {:controller addr} {$set {:controller nil :procedure nil} }))
+
+(defn get-subject [subject] (mc/find-map-by-id db subj-coll subject))
+
+(defn get-subject-by-addr [addr] (mc/find-one-as-map db subj-coll {:controller addr}))
+
+(defn log-event! [data] (ok? (mc/insert db event-coll data)))

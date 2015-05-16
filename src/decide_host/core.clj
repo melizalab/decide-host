@@ -5,6 +5,7 @@
             [clojure.core.async :as async :refer [>! <! >!! <!!]]
             [clojure.core.match :refer [match]]
             [clj-time.core :as t]
+            [clj-time.coerce :as tc]
             [digest]
             [cheshire.core :as json]))
 
@@ -53,13 +54,20 @@
     (catch Exception e nil)))
 
 (defn store-event!
-  [id data]
-  (println "D:" id "state-changed:" data)
-  true)
+  [addr data]
+  (println "D:" addr "state-changed:" data)
+  (let [{:keys [name time]} data
+        time (tc/from-long time)]
+    (when (= name "experiment")
+      (let [{:keys [subject procedure user]} data]
+        (if-not (nil? subject)
+          (db/start-subject! subject {:procedure procedure :controller addr :user user})
+          (db/stop-subject! addr))))
+    (db/log-event! (assoc data :addr addr :time time))))
 
 (defn store-trial!
-  [id data]
-  (println "D:" id "trial-data:" data)
+  [addr data]
+  (println "D:" addr "trial-data:" data)
   true)
 
 (defn store-data!
@@ -67,8 +75,8 @@
   (when-let [address (:_id (db/get-controller-by-socket id))]
     (when-let [payload (decode-pub data)]
       (case data-type
-        "state-changed" (store-event! id payload)
-        "trial-data" (store-trial! id payload)
+        "state-changed" (store-event! address payload)
+        "trial-data" (store-trial! address payload)
         (bad-message data-type)))))
 
 ;;; the zmq message handling loop
@@ -94,7 +102,7 @@
 (defn start-zmq-server [addr]
   (register-socket! {:in zmq-in :out zmq-out :socket-type :router
                      :configurator (fn [socket] (.bind socket addr))})
-  #_(async/go-loop []
+  (async/go-loop []
     (<! (async/timeout (config :heartbeat-ms)))
     (dorun (map check-connection (db/get-living-controllers)))
     (recur)))
