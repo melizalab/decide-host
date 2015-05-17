@@ -1,5 +1,5 @@
 {
-    "addr-int": "tcp://192.168.10.1:5555",
+    "addr-int": "tcp://localhost:5555",
     "heartbeat-ms": 2000,
     "heartbeat-maxcount": 5,
     "addr-ext": "localhost",

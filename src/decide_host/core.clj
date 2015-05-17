@@ -10,7 +10,6 @@
             [cheshire.core :as json]))
 
 (def config (json/parse-string (slurp "config/host-config.json") true))
-
 (def zmq-in (async/chan (async/sliding-buffer 64)))
 (def zmq-out (async/chan (async/sliding-buffer 64)))
 
@@ -57,18 +56,23 @@
   [addr data]
   (println "D:" addr "state-changed:" data)
   (let [{:keys [name time]} data
-        time (tc/from-long time)]
+        usec (mod time 1000)
+        time (tc/from-long (long (/ time 1000)))]
     (when (= name "experiment")
       (let [{:keys [subject procedure user]} data]
         (if-not (nil? subject)
-          (db/start-subject! subject {:procedure procedure :controller addr :user user})
-          (db/stop-subject! addr))))
-    (db/log-event! (assoc data :addr addr :time time))))
+          (db/start-subject! subject {:procedure procedure :controller addr
+                                      :user user :start-time time})
+          (db/stop-subject! addr time))))
+    (db/log-event! (assoc data :addr addr :time time :usec usec))))
 
 (defn store-trial!
   [addr data]
   (println "D:" addr "trial-data:" data)
-  true)
+  (let [{:keys [time]} data
+        usec (mod time 1000)
+        time (tc/from-long (long (/ time 1000)))]
+    (db/log-trial! (assoc data :addr addr :time time :usec usec))))
 
 (defn store-data!
   [id data-type data]
@@ -102,6 +106,7 @@
 (defn start-zmq-server [addr]
   (register-socket! {:in zmq-in :out zmq-out :socket-type :router
                      :configurator (fn [socket] (.bind socket addr))})
+  (println "I: bound decide-host to" addr)
   (async/go-loop []
     (<! (async/timeout (config :heartbeat-ms)))
     (dorun (map check-connection (db/get-living-controllers)))
@@ -111,12 +116,12 @@
 (defn -main
   "I don't do a whole lot ... yet."
   [& args]
-)
+  (db/connect! (:log-db config))
+  (start-zmq-server (:addr-int config)))
 
 (comment
   (require '[clojure.pprint :refer [pprint]]
            '[clojure.stacktrace :refer [e]]
            '[clojure.tools.namespace.repl :refer [refresh refresh-all]])
   (clojure.tools.namespace.repl/refresh)
-
   )
