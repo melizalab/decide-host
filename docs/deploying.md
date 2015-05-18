@@ -28,6 +28,23 @@ In order for devices on the private network to access the Internet (which is use
 
 Devices connecting to the private network need to be assigned IP addresses and hostnames. `dnsmasq` is a simple DHCP and DNS server that can accomplish both these tasks for small subnets.  After installing `dnsmasq` on the host, copy `dnsmasq.conf` in this directory to `/etc/dnsmasq.conf` and restart `dnsmasq`. The BBBs should now be able to obtain IP addresses in the range `192.168.10.101` to `192.168.10.220`. Confirm that leases are listed on the host computer in `/var/lib/misc/dnsmasq.leases`, and that you can retrieve the IP address of any connected BBB as follows: `dig <bbb-name> @localhost`.
 
+## Mail
+
+Both the controllers and the host use email to notify users of severe errors. These users are specified on the commandline of experiment programs and in the host configuration file. In order for this to work, you need a mail transport agent (MTA) that will accept email from the controllers. You can set up the gateway computer to handle mail delivery.
+
+On Debian, the following steps should work for most configurations.
+
+1. Install `exim4` with `apt-get install exim4`. If you are not asked to configure the server (it may already be installed), run `dpkg-reconfigure exim4-config`. Set the general type of configuration to `internet site`, then configure the server to only accept connections on the private network (`192.168.10.0/24`) and to relay mail from the same. You should also set `exim4` to use a single configuration file.
+
+2. Edit `/etc/exim4/exim4.conf.template` and set `sender_unqualified_hosts` and `recipient_unqualified_hosts` to `MAIN_RELAY_NETS`. Restart the MTA with `systemctl restart exim4.service`.
+
+3. Edit `config/host-config.json` on the controllers and set `mail_transport` to `{"host": 192.168.10.1, "port": 25}`. Do the same for the host.
+
+4. To test on the controllers, run `node test/test_mail.js <recipient>` to see if mail gets delivered to a recipient.
+
+With this configuration, emails from the controllers will be addressed from
+`<controller-name>@<host-name>`, and emails from the host will be addressed from `decide-host@<host-name>`. You should be able to specify any fully-qualified email as a recipient in configuration files or on the commandline; you can also deliver mail locally to a user on the host machine, in which case users should set up a `.forward` file to make sure these emails reach them at their normal email accounts.
+
 ## Host daemon
 
 The program that handles communication with devices on the network is called `decide-host.js` and runs in `node`, although it's written
