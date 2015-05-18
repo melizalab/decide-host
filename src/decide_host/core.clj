@@ -93,6 +93,7 @@
       "PUB" (let [[data-type payload] (map to-string data)]
               (db/controller-alive! id)
               (when-not (nil? (store-data! id data-type payload))
+                (println "D: ACK" (digest/md5 payload))
                 (async/put! zmq-in [id "ACK" (digest/md5 payload)])))
       "HUGZ" (do
                (db/controller-alive! id)
