@@ -15,6 +15,7 @@
 
 (let [{:keys [conn db]} (connect! test-uri)
       subject "acde" sock-id "test-ctrl" addr "test" tt (t/now)]
+  (mg/drop-db conn test-db)
   (with-state-changes [(after :facts (mg/drop-db conn test-db))]
     (fact "about controller state management"
         (fact "bad values return nil"

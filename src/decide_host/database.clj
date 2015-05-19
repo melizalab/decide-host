@@ -16,8 +16,12 @@
 (def db (atom nil))
 
 (defn object-id
+  "Returns a new BSON ObjectID, either newly generated or from a string
+  argument. If the string can't be converted to an ObjectID, it's returned
+  as-is."
   ([] (ObjectId.))
-  ([x] (ObjectId. x)))
+  ([x] (try (ObjectId. x)
+            (catch IllegalArgumentException e x))))
 
 (defn connect!
   "Connect to a mongodb database"
@@ -76,7 +80,7 @@
     (let [coll (case data-type
                     "state-changed" event-coll
                     "trial-data" trial-coll)
-          obj-id (ObjectId. data-id)]
+          obj-id (object-id data-id)]
       (if (updated-existing? (mc/update @db coll {:_id obj-id} data {:upsert true}))
         :dup :ack))
     (catch IllegalArgumentException e :rtfm)))

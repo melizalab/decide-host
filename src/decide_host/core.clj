@@ -14,6 +14,7 @@
 (def zmq-out (async/chan (async/sliding-buffer 64)))
 
 (defn to-string [x] (when-not (nil? x) (String. x)))
+(defn to-hex [x] (when-not (nil? x) (apply str (map #(format "%02x" %) x))))
 (defn bad-message [msg] (println "E: bad message:" msg))
 
 (defn decode-pub
@@ -77,30 +78,31 @@
                         :time (tc/from-long (long (/ time 1000)))
                         :usec (mod time 1000))]
         (update-subject! data)
-        (case (db/log-message! data-type data-id data)
-          :ack ["ACK" data-id]
-          :dup ["DUP" data-id]
-          :rtfm ["RTFM" (str "unsupported data type " data-type)])))))
+        (db/log-message! data-type data-id data)))))
 
 ;;; the zmq message handler
 (defn process-message!
   [id & data]
-  (let [[ps s1 s2 s3] (map to-string data)]
+  (let [[ps s1 s2 s3] (map to-string data)
+        right-protocol protocol]
     (match [ps s1 s2 s3]
            ;; open-peering
-           ["OHAI" protocol addr _]
-           (if (connect! id addr)
-             ["OHAI-OK"]
-             ["WTF" (str addr " is already connected")])
+           ["OHAI" right-protocol addr _]
+           (case (connect! id addr)
+             :ok ["OHAI-OK"]
+             :wtf ["WTF" (str addr " is already connected")])
            ["OHAI" wrong-protocol _ _]
-           ["WTF" (str " server supports " protocol)]
+           ["RTFM" (str " server supports " protocol)]
 
            ;; use-peering
            ["PUB" data-type data-id data-str]
            (do
              (db/controller-alive! id)
-
-             (store-data! id data-type data-id data-str))
+             (case (store-data! id data-type data-id data-str)
+               :ack ["ACK" data-id]
+               :dup ["DUP" data-id]
+               :rtfm ["RTFM" (str "unsupported data type " data-type)]
+               ["RTFM" "data sent before handshake"]))
            ["HUGZ" _ _ _]
            (do
              (db/controller-alive! id)
@@ -108,7 +110,7 @@
            ["HUGZ-OK" _ _ _] (db/controller-alive! id)
 
            ;; close-peering
-           ["OKTHXBAI" _ _ _] (disconnect! id)
+           ["KTHXBAI" _ _ _] (disconnect! id)
 
            ;; error message
            :else ["RTFM" "unrecognized command"])))
@@ -121,11 +123,11 @@
   (let [running (atom true)]
     (async/go
       (loop [[id & data] (<! zmq-out)]
-        (when-let [id (to-string id)]
+        (when-let [id (to-hex id)]
           (when-let [result (apply process-message! id data)]
             (>! zmq-in (cons id result)))
           (recur (<! zmq-out))))
-      (println "I: unbound decide-host socket")
+      (println "I: released decide-host socket")
       (reset! running false))
     (async/go
       (while @running
