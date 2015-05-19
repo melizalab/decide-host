@@ -2,7 +2,7 @@
   (:require [monger.joda-time]
             [monger.core :as mg]
             [monger.collection :as mc]
-            [monger.result :refer [ok?]]
+            [monger.result :refer [ok? updated-existing?]]
             [monger.operators :refer :all]
             [clj-time.core :as t])
   (:import [org.bson.types ObjectId]))
@@ -14,6 +14,10 @@
 (def ctrl-coll "controllers")
 
 (def db (atom nil))
+
+(defn object-id
+  ([] (ObjectId.))
+  ([x] (ObjectId. x)))
 
 (defn connect!
   "Connect to a mongodb database"
@@ -42,7 +46,7 @@
   ([sock-id alive] (update-controller! sock-id {:alive alive})))
 
 (defn get-controller-by-socket [sock-id] (mc/find-one-as-map @db ctrl-coll {:zmq-id sock-id}))
-(defn get-controller-by-addr [addr] (mc/find-map-by-id @db ctrl-coll addr))
+(defn get-controller-by-addr [addr] (when addr (mc/find-map-by-id @db ctrl-coll addr)))
 (defn get-living-controllers [] (mc/find-maps @db ctrl-coll {:alive true}))
 
 (defn start-subject!
@@ -57,22 +61,21 @@
                           {:controller addr}
                           {$set {:controller nil :procedure nil :stop-time time} })))
 
-(defn get-subject [subject] (mc/find-map-by-id @db subj-coll subject))
+(defn get-subject [subject] (when subject (mc/find-map-by-id @db subj-coll subject)))
 (defn get-subject-by-addr [addr] (mc/find-one-as-map @db subj-coll {:controller addr}))
-(defn get-experiment
+(defn get-procedure
   "Gets currently running experiment for subject iff the associated controller is alive"
   [subject]
   (let [subj (get-subject subject)
         ctrl (get-controller-by-addr (:controller subj))]
-    (when (:alive ctrl) (:experiment subj))))
+    (when (:alive ctrl) (:procedure subj))))
 
-(defn log-event! [data-id data]
-  (let [obj-id (ObjectId. data-id)
-        data (assoc data :_id obj-id)]
-    (ok? (mc/save @db event-coll data))))
-
-(defn log-trial! [data-id data]
-  (let [obj-id (ObjectId. data-id)
-        data (assoc data :_id obj-id)]
-    (println "D: trial-data:" data)
-    (ok? (mc/save @db trial-coll data))))
+(defn log-message! [data-type data-id data]
+  (try
+    (let [coll (case data-type
+                    "state-changed" event-coll
+                    "trial-data" trial-coll)
+          obj-id (ObjectId. data-id)]
+      (if (updated-existing? (mc/update @db coll {:_id obj-id} data {:upsert true}))
+        :dup :ack))
+    (catch IllegalArgumentException e :rtfm)))

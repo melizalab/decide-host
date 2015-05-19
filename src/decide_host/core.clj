@@ -6,7 +6,6 @@
             [clojure.core.match :refer [match]]
             [clj-time.core :as t]
             [clj-time.coerce :as tc]
-            [digest]
             [cheshire.core :as json]))
 
 (def protocol "decide-host@1")
@@ -54,30 +53,30 @@
     (json/parse-string (to-string bytes) true)
     (catch Exception e nil)))
 
-(defn store-event!
-  [data-id data]
-  (println "D: state-changed:" data)
-  (let [{:keys [name subject procedure user]} data]
+(defn update-subject!
+  [data]
+  (let [{:keys [name subject procedure user addr time]} data]
     (when (= name "experiment")
       (if-not (nil? subject)
         (db/start-subject! subject {:procedure procedure :controller addr
                                     :user user :start-time time})
-        (db/stop-subject! addr time)))
-    (db/log-event! data-id data)))
+        (db/stop-subject! addr time)))))
 
 (defn store-data!
   [id data-type data-id data]
-  (when-let [address (:_id (db/get-controller-by-socket id))]
+  (println "D:" data-type data)
+  (when-let [addr (:_id (db/get-controller-by-socket id))]
     (when-let [data (decode-pub data)]
       (let [time (:time data)
             data (assoc data
-                        :addr address
+                        :addr addr
                         :time (tc/from-long (long (/ time 1000)))
                         :usec (mod time 1000))]
-        (case data-type
-        "state-changed" (store-event! data-id data)
-        "trial-data" (db/log-trial! data-id data)
-        (bad-message data-type))))))
+        (update-subject! data)
+        (case (db/log-message! data-type data-id data)
+          :ack ["ACK" data-id]
+          :dup ["DUP" data-id]
+          :rtfm ["RTFM" (str "unsupported data type " data-type)])))))
 
 ;;; the zmq message handler
 (defn process-message!
@@ -87,29 +86,28 @@
            ;; open-peering
            ["OHAI" protocol addr _]
            (if (connect! id addr)
-             [id "OHAI-OK"]
-             [id "WTF" (str addr "is already connected")])
+             ["OHAI-OK"]
+             ["WTF" (str addr " is already connected")])
            ["OHAI" wrong-protocol _ _]
-           [id "WTF" (str "server supports" protocol)]
+           ["WTF" (str " server supports " protocol)]
 
            ;; use-peering
            ["PUB" data-type data-id data-str]
            (do
              (db/controller-alive! id)
+
              (store-data! id data-type data-id data-str))
-           ["PUB" wrong-data-type _ _]
-           [id "RTFM" "unsupported data type"]
            ["HUGZ" _ _ _]
            (do
              (db/controller-alive! id)
-             [id "HUGZ-OK"])
+             ["HUGZ-OK"])
            ["HUGZ-OK" _ _ _] (db/controller-alive! id)
 
            ;; close-peering
            ["OKTHXBAI" _ _ _] (disconnect! id)
 
            ;; error message
-           :else [id "RTFM" "unrecognized command"])))
+           :else ["RTFM" "unrecognized command"])))
 
 
 (defn start-zmq-server [addr]
@@ -121,7 +119,7 @@
       (loop [[id & data] (<! zmq-out)]
         (when-let [id (to-string id)]
           (when-let [result (apply process-message! id data)]
-            (>! zmq-in result))
+            (>! zmq-in (cons id result)))
           (recur (<! zmq-out))))
       (println "I: unbound decide-host socket")
       (reset! running false))
