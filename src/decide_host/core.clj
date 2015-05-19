@@ -9,6 +9,7 @@
             [digest]
             [cheshire.core :as json]))
 
+(def protocol "decide-host@1")
 (def config (json/parse-string (slurp "config/host-config.json") true))
 (def zmq-in (async/chan (async/sliding-buffer 64)))
 (def zmq-out (async/chan (async/sliding-buffer 64)))
@@ -41,6 +42,7 @@
   (let [{:keys [last-seen zmq-id]} controller
         {:keys [heartbeat-ms heartbeat-maxcount]} config
         interval (t/in-millis (t/interval last-seen (t/now)))]
+    (println "D:" zmq-id "last seen" interval "ms ago")
       (cond
        (> interval (* heartbeat-maxcount heartbeat-ms)) (connection-error! controller)
        (> interval heartbeat-ms) (async/put! zmq-in [zmq-id "HUGZ"]))))
@@ -53,66 +55,80 @@
     (catch Exception e nil)))
 
 (defn store-event!
-  [addr data]
-  (println "D:" addr "state-changed:" data)
-  (let [{:keys [name time]} data
-        usec (mod time 1000)
-        time (tc/from-long (long (/ time 1000)))]
+  [data-id data]
+  (println "D: state-changed:" data)
+  (let [{:keys [name subject procedure user]} data]
     (when (= name "experiment")
-      (let [{:keys [subject procedure user]} data]
-        (if-not (nil? subject)
-          (db/start-subject! subject {:procedure procedure :controller addr
-                                      :user user :start-time time})
-          (db/stop-subject! addr time))))
-    (db/log-event! (assoc data :addr addr :time time :usec usec))))
-
-(defn store-trial!
-  [addr data]
-  (println "D:" addr "trial-data:" data)
-  (let [{:keys [time]} data
-        usec (mod time 1000)
-        time (tc/from-long (long (/ time 1000)))]
-    (db/log-trial! (assoc data :addr addr :time time :usec usec))))
+      (if-not (nil? subject)
+        (db/start-subject! subject {:procedure procedure :controller addr
+                                    :user user :start-time time})
+        (db/stop-subject! addr time)))
+    (db/log-event! data-id data)))
 
 (defn store-data!
-  [id data-type data]
+  [id data-type data-id data]
   (when-let [address (:_id (db/get-controller-by-socket id))]
-    (when-let [payload (decode-pub data)]
-      (case data-type
-        "state-changed" (store-event! address payload)
-        "trial-data" (store-trial! address payload)
-        (bad-message data-type)))))
+    (when-let [data (decode-pub data)]
+      (let [time (:time data)
+            data (assoc data
+                        :addr address
+                        :time (tc/from-long (long (/ time 1000)))
+                        :usec (mod time 1000))]
+        (case data-type
+        "state-changed" (store-event! data-id data)
+        "trial-data" (db/log-trial! data-id data)
+        (bad-message data-type))))))
 
-;;; the zmq message handling loop
-(async/go-loop [[id mtype & data] (<! zmq-out)]
-  (when-let [id (to-string id)]
-    (case (to-string mtype)
-      "OHAI" (when-let [ctrl-addr (to-string (first data))]
-               (let [out-msg (if (connect! id ctrl-addr) "OHAI-OK" "WTF")]
-                 (>! zmq-in [id out-msg])))
-      "PUB" (let [[data-type payload] (map to-string data)]
-              (db/controller-alive! id)
-              (when-not (nil? (store-data! id data-type payload))
-                (println "D: ACK" (digest/md5 payload))
-                (async/put! zmq-in [id "ACK" (digest/md5 payload)])))
-      "HUGZ" (do
-               (db/controller-alive! id)
-               (>! zmq-in [id "HUGZ-OK"]))
-      "HUGZ-OK" (db/controller-alive! id)
-      "BYE" (disconnect! id)
-      (bad-message mtype)))
-  (recur (<! zmq-out)))
+;;; the zmq message handler
+(defn process-message!
+  [id & data]
+  (let [[ps s1 s2 s3] (map to-string data)]
+    (match [ps s1 s2 s3]
+           ;; open-peering
+           ["OHAI" protocol addr _]
+           (if (connect! id addr)
+             [id "OHAI-OK"]
+             [id "WTF" (str addr "is already connected")])
+           ["OHAI" wrong-protocol _ _]
+           [id "WTF" (str "server supports" protocol)]
+
+           ;; use-peering
+           ["PUB" data-type data-id data-str]
+           (do
+             (db/controller-alive! id)
+             (store-data! id data-type data-id data-str))
+           ["PUB" wrong-data-type _ _]
+           [id "RTFM" "unsupported data type"]
+           ["HUGZ" _ _ _]
+           (do
+             (db/controller-alive! id)
+             [id "HUGZ-OK"])
+           ["HUGZ-OK" _ _ _] (db/controller-alive! id)
+
+           ;; close-peering
+           ["OKTHXBAI" _ _ _] (disconnect! id)
+
+           ;; error message
+           :else [id "RTFM" "unrecognized command"])))
 
 
 (defn start-zmq-server [addr]
   (register-socket! {:in zmq-in :out zmq-out :socket-type :router
                      :configurator (fn [socket] (.bind socket addr))})
   (println "I: bound decide-host to" addr)
-  (async/go-loop []
-    (<! (async/timeout (config :heartbeat-ms)))
-    (dorun (map check-connection (db/get-living-controllers)))
-    (recur)))
-
+  (let [running (atom true)]
+    (async/go
+      (loop [[id & data] (<! zmq-out)]
+        (when-let [id (to-string id)]
+          (when-let [result (apply process-message! id data)]
+            (>! zmq-in result))
+          (recur (<! zmq-out))))
+      (println "I: unbound decide-host socket")
+      (reset! running false))
+    (async/go
+      (while @running
+        (<! (async/timeout (config :heartbeat-ms)))
+        (dorun (map check-connection (db/get-living-controllers)))))))
 
 (defn -main
   "I don't do a whole lot ... yet."

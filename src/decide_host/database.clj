@@ -5,7 +5,7 @@
             [monger.result :refer [ok?]]
             [monger.operators :refer :all]
             [clj-time.core :as t])
-  (:import [com.mongodb DB WriteConcern MongoException]))
+  (:import [org.bson.types ObjectId]))
 
 ;; collection names
 (def event-coll "events")
@@ -34,7 +34,7 @@
 
 (defn update-controller!
   "Updates database entry for controller"
-  [sock-id kv] (mc/update @db ctrl-coll {:zmq-id sock-id} {$set kv}))
+  [sock-id kv] (mc/update @db ctrl-coll {:zmq-id sock-id} {$set kv} {:multi true}))
 
 (defn controller-alive!
   "Updates database with connection status of controller"
@@ -66,13 +66,13 @@
         ctrl (get-controller-by-addr (:controller subj))]
     (when (:alive ctrl) (:experiment subj))))
 
-;; apparently there is no way to just silently drop duplicated unique keys
-(defn log-event! [data]
-  (try
-    (ok? (mc/insert @db event-coll data))
-    (catch MongoException e nil)))
+(defn log-event! [data-id data]
+  (let [obj-id (ObjectId. data-id)
+        data (assoc data :_id obj-id)]
+    (ok? (mc/save @db event-coll data))))
 
-(defn log-trial! [data]
-  (try
-    (ok? (mc/insert @db trial-coll data))
-    (catch MongoException e nil)))
+(defn log-trial! [data-id data]
+  (let [obj-id (ObjectId. data-id)
+        data (assoc data :_id obj-id)]
+    (println "D: trial-data:" data)
+    (ok? (mc/save @db trial-coll data))))
