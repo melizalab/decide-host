@@ -16,13 +16,24 @@
 (defn to-string [x] (when-not (nil? x) (String. x)))
 (defn bad-message [msg] (println "E: bad message:" msg))
 
+(defn decode-pub
+  "Decodes payload of a PUB message, returning nil on errors"
+  [bytes]
+  (try
+    (json/parse-string (to-string bytes) true)
+    (catch Exception e nil)))
+
 (defn connect!
   "Registers a controller as connected. Returns true if successful, nil if the address is taken"
   [sock-id ctrl-addr]
   (let [controller (db/get-controller-by-addr ctrl-addr)]
-    (when 1 ;(or (nil? controller) (not (:alive controller)))
-      (println "I:" ctrl-addr "connected")
-      (db/add-controller! sock-id ctrl-addr))))
+    (if (or (nil? controller) (not (:alive controller)))
+      (do
+        (println "I:" ctrl-addr "connected")
+        (db/remove-controller! sock-id)
+        (db/add-controller! sock-id ctrl-addr)
+        :ok)
+      :wtf)))
 
 (defn disconnect!
   [sock-id]
@@ -45,13 +56,6 @@
       (cond
        (> interval (* heartbeat-maxcount heartbeat-ms)) (connection-error! controller)
        (> interval heartbeat-ms) (async/put! zmq-in [zmq-id "HUGZ"]))))
-
-(defn decode-pub
-  "Decodes payload of a PUB message, returning nil on errors"
-  [bytes]
-  (try
-    (json/parse-string (to-string bytes) true)
-    (catch Exception e nil)))
 
 (defn update-subject!
   [data]

@@ -25,7 +25,8 @@
   (let [res (mg/connect-via-uri uri)]
     (mg/get-db-names (:conn res))       ; will throw error for bad connection
     (println "I: connected to database at" uri)
-    (reset! db (:db res))))
+    (reset! db (:db res))
+    res))
 
 (defn add-controller!
   [sock-id addr]
