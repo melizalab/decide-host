@@ -62,11 +62,6 @@
         (count-controllers) => 1
         (disconnect! sock-id)
         (count-controllers) => 0
-        (connect! sock-id addr) => :ok)
-    (fact "controllers can reconnect after errors"
-        (connect! sock-id addr) => :ok
-        (connection-error! (db/get-controller-by-addr addr))
-        (count-controllers) => 0
         (connect! sock-id addr) => :ok))
   (fact "processing incoming messages"
     (fact "unrecognized messages rejected"

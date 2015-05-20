@@ -33,10 +33,10 @@
     res))
 
 (defn add-controller!
-  [sock-id addr]
+  [sock-id addr & kv]
   (mc/update @db ctrl-coll
              {:_id addr}
-             {:addr addr :zmq-id sock-id :alive true :last-seen (t/now)}
+             (apply assoc {:addr addr :zmq-id sock-id} :last-seen (t/now) kv)
              {:upsert true}))
 
 (defn remove-controller!
@@ -47,15 +47,13 @@
   "Updates database entry for controller"
   [sock-id kv] (mc/update @db ctrl-coll {:zmq-id sock-id} {$set kv} {:multi true}))
 
-(defn controller-alive!
-  "Updates database with connection status of controller"
-  ([sock-id] (update-controller! sock-id {:alive true :last-seen (t/now)}) nil)
-  ([sock-id alive] (update-controller! sock-id {:alive alive}) nil))
-
+(defn dec-alive!
+  "Decrements aliveness counter for controller"
+  [sock-id] (mc/update @db ctrl-coll {:zmq-id sock-id} {$inc {:alive -1}}))
 
 (defn get-controller-by-socket [sock-id] (mc/find-one-as-map @db ctrl-coll {:zmq-id sock-id}))
 (defn get-controller-by-addr [addr] (when addr (mc/find-map-by-id @db ctrl-coll addr)))
-(defn get-living-controllers [] (mc/find-maps @db ctrl-coll {:alive true}))
+(defn get-living-controllers [] (mc/find-maps @db ctrl-coll {:alive {$gt 0}}))
 
 (defn start-subject!
   "Updates database when subject starts running an experiment"
@@ -74,9 +72,9 @@
 (defn get-procedure
   "Gets currently running experiment for subject iff the associated controller is alive"
   [subject]
-  (let [subj (get-subject subject)
-        ctrl (get-controller-by-addr (:controller subj))]
-    (when (:alive ctrl) (:procedure subj))))
+  (let [{:keys [controller procedure]} (get-subject subject)
+        ctrl (mc/find-one-as-map @db ctrl-coll {:_id controller :alive {$gt 0}})]
+    (when ctrl procedure)))
 
 (defn log-message! [data-type data-id data]
   (try

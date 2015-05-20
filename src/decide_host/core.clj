@@ -10,6 +10,7 @@
 
 (def protocol "decide-host@1")
 (def config (json/parse-string (slurp "config/host-config.json") true))
+(def INIT-ALIVE (get config :heartbeat-max-ping 10))
 (def version (-> "project.clj" slurp read-string (nth 2)))
 
 (defn to-string [x] (when-not (nil? x) (String. x)))
@@ -28,16 +29,16 @@
   "Registers a controller as connected. :ok if successful, :wtf if the address is taken"
   [sock-id ctrl-addr]
   (let [{:keys [alive zmq-id]} (db/get-controller-by-addr ctrl-addr)]
-    (match [alive zmq-id]
+    (match [(or alive 0) zmq-id]
            ;; another OHAI from existing client - noop
-           [true sock-id] :ok
+           [(_ :guard pos?) sock-id] :ok
            ;; socket does not match controller
-           [true wrong-id] :wtf
+           [(_ :guard pos?) wrong-id] :wtf
            ;; otherwise, drop old record and add new one
            :else (do
                    (println "I:" ctrl-addr "connected")
                    (db/remove-controller! sock-id)
-                   (db/add-controller! sock-id ctrl-addr)
+                   (db/add-controller! sock-id ctrl-addr :alive INIT-ALIVE)
                    :ok))))
 
 (defn disconnect!
@@ -46,21 +47,27 @@
     (println "I:" (:addr controller) "disconnected"))
   (db/remove-controller! sock-id) nil)
 
+(defn controller-alive!
+  "Updates database with connection status of controller"
+  [sock-id] (db/update-controller! sock-id {:alive INIT-ALIVE :last-seen (t/now)}) nil)
+
 (defn connection-error!
   [controller]
   (println "W:" (:addr controller) "disconnected unexpectedly")
   ;; TODO notify user
-  (db/controller-alive! (:zmq-id controller) false))
+  #_(db/controller-alive! (:zmq-id controller) 0))
 
 (defn check-connection
   [controller]
-  (let [{:keys [addr last-seen zmq-id]} controller
-        {:keys [heartbeat-ms heartbeat-maxcount]} config
+  (let [{:keys [addr alive last-seen zmq-id]} controller
+        {:keys [heartbeat-ms]} config
         interval (t/in-millis (t/interval last-seen (t/now)))]
     #_(println "D:" addr "last seen" interval "ms ago")
-      (cond
-       (> interval (* heartbeat-maxcount heartbeat-ms)) (connection-error! controller)
-       (> interval heartbeat-ms) zmq-id)))
+    (cond
+      (not (pos? alive)) (connection-error! controller)
+      (> interval heartbeat-ms) (do
+                                  (db/dec-alive! zmq-id)
+                                  zmq-id))))
 
 (defn update-subject!
   [data]
@@ -102,7 +109,7 @@
            ;; use-peering
            ["PUB" data-type data-id data-str]
            (do
-             (db/controller-alive! id)
+             (controller-alive! id)
              (case (store-data! id data-type data-id data-str)
                :ack ["ACK" data-id]
                :dup ["DUP" data-id]
@@ -110,9 +117,9 @@
                ["RTFM" "data sent before handshake"]))
            ["HUGZ" _ _ _]
            (do
-             (db/controller-alive! id)
+             (controller-alive! id)
              ["HUGZ-OK"])
-           ["HUGZ-OK" _ _ _] (db/controller-alive! id)
+           ["HUGZ-OK" _ _ _] (controller-alive! id)
 
            ;; close-peering
            ["KTHXBAI" _ _ _] (disconnect! id)

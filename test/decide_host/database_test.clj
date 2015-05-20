@@ -8,6 +8,7 @@
 
 (def test-db "decide-test")
 (def test-uri (str "mongodb://localhost/" test-db))
+(def INIT-ALIVE 5)
 
 (fact "bad uris generate exceptions"
     (connect! "garbledegook") => (throws Exception)
@@ -23,14 +24,13 @@
               (get-controller-by-socket nil) => nil
               (get-controller-by-addr addr) => nil
               (get-controller-by-socket sock-id) => nil)
-        (ok? (add-controller! sock-id addr)) => truthy
-        (get-controller-by-addr addr) => (contains {:zmq-id sock-id :alive true :_id addr})
-        (get-controller-by-socket sock-id) => (contains {:zmq-id sock-id :alive true :_id addr})
+        (ok? (add-controller! sock-id addr :alive INIT-ALIVE)) => truthy
+        (get-controller-by-addr addr) => (contains {:zmq-id sock-id :alive INIT-ALIVE :_id addr})
+        (get-controller-by-socket sock-id) => (contains {:zmq-id sock-id :alive INIT-ALIVE :_id addr})
         (count (get-living-controllers)) => 1
-        (controller-alive! sock-id)
-        (:last-seen (get-controller-by-addr addr)) => #(t/after? % tt)
-        (controller-alive! sock-id false)
-        (count (get-living-controllers)) => 0)
+        (update-controller! sock-id {:alive 0})
+        (count (get-living-controllers)) => 0
+        )
     (fact "about subject state management"
         (fact "bad values return nil"
               (get-subject nil) => nil
@@ -54,10 +54,10 @@
           (mc/count db event-coll {:subject "acde"}) => 1))
     (fact "about integrated subject/controller state"
         (let [data {:controller addr :procedure "testing"}]
-          (ok? (add-controller! sock-id addr)) => truthy
+          (ok? (add-controller! sock-id addr :alive INIT-ALIVE)) => truthy
           (ok? (start-subject! subject data)) => truthy
           (get-procedure subject) => (:procedure data)
           (get-procedure "some-other-subject") => nil
-          (controller-alive! sock-id false)
+          (update-controller! sock-id {:alive 0})
           (get-procedure subject) => nil
           ))))
