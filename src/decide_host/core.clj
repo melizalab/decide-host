@@ -10,6 +10,7 @@
 
 (def protocol "decide-host@1")
 (def config (json/parse-string (slurp "config/host-config.json") true))
+(def version (-> "project.clj" slurp read-string (nth 2)))
 
 (defn to-string [x] (when-not (nil? x) (String. x)))
 (defn bytes-to-hex [x] (when-not (nil? x) (apply str (map #(format "%02x" %) x))))
@@ -56,7 +57,7 @@
   (let [{:keys [addr last-seen zmq-id]} controller
         {:keys [heartbeat-ms heartbeat-maxcount]} config
         interval (t/in-millis (t/interval last-seen (t/now)))]
-    (println "D:" addr "last seen" interval "ms ago")
+    #_(println "D:" addr "last seen" interval "ms ago")
       (cond
        (> interval (* heartbeat-maxcount heartbeat-ms)) (connection-error! controller)
        (> interval heartbeat-ms) zmq-id)))
@@ -72,7 +73,7 @@
 
 (defn store-data!
   [id data-type data-id data]
-  (println "D:" data-type data)
+  #_(println "D: storing data" id data-type data-id data)
   (when-let [addr (:addr (db/get-controller-by-socket id))]
     (when-let [data (decode-pub data)]
       (let [time (:time data)
@@ -88,7 +89,7 @@
   [id & data]
   (let [[ps s1 s2 s3] (map to-string data)
         right-protocol protocol]
-    (println "D: received" id ps s1 s2 s3)
+    #_(println "D: received" id ps s1 s2 s3)
     (match [ps s1 s2 s3]
            ;; open-peering
            ["OHAI" right-protocol (addr :guard (complement nil?)) _]
@@ -119,6 +120,17 @@
            ;; error message
            :else ["RTFM" (str "unrecognized command '" ps "'")])))
 
+(defn message-handler
+  [zmq-in zmq-out running]
+  (fn []
+        (loop [[id & data] (<!! zmq-out)]
+          (when-let [id (bytes-to-hex id)]
+            (when-let [result (apply process-message! id data)]
+              #_(println "D: sending" id result)
+              (>!! zmq-in (cons (hex-to-bytes id) result)))
+            (recur (<!! zmq-out))))
+        (println "I: released decide-host socket")
+        (reset! running false)))
 
 (defn start-zmq-server
   "Starts the zeromq server, which will bind to addr. Closing the returned input
@@ -131,29 +143,28 @@
     (println "I: bound decide-host to" addr)
     (let [running (atom true)]
       (async/go
-        (loop [[id & data] (<! zmq-out)]
-          (when-let [id (bytes-to-hex id)]
-            (when-let [result (apply process-message! id data)]
-              (println "D: sending" id result)
-              (>! zmq-in (cons (hex-to-bytes id) result)))
-            (recur (<! zmq-out))))
-        (println "I: released decide-host socket")
-        (reset! running false))
-      (async/go
         (while @running
           (<! (async/timeout (config :heartbeat-ms)))
           (dorun (for [zmq-id (map check-connection (db/get-living-controllers))]
                    (when zmq-id
-                     (println "D: sending" zmq-id "HUGZ")
-                     (async/put! zmq-in [(hex-to-bytes zmq-id) "HUGZ"])))))))
+                     #_(println "D: sending" zmq-id "HUGZ")
+                     (async/put! zmq-in [(hex-to-bytes zmq-id) "HUGZ"]))))))
+      (doto (Thread. (message-handler zmq-in zmq-out running))
+        (.setName "decide-host message handler")
+        (.start)))
     ;; return channel that will shut down the server
     zmq-in))
 
 (defn -main
   "I don't do a whole lot ... yet."
   [& args]
+  (println "I: this is decide-host, version" version)
   (db/connect! (:log-db config))
-  (start-zmq-server (:addr-int config)))
+  (start-zmq-server (:addr-int config))
+  ;; this doesn't seem to work
+  #_(let [server ]
+    (.addShutdownHook (Runtime/getRuntime)
+                      (Thread. #(async/close! server)))))
 
 (comment
   (require '[clojure.pprint :refer [pprint]]
