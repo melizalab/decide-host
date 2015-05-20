@@ -25,13 +25,13 @@ The following exchanges are allowed between the host (S) and the controller (C).
 
 ```abnf
 dhc-protocol    = open-peering *use-peering [ close-peering ]
-open-peering    = C:OHAI (S:"OHAI-OK" / error)
+open-peering    = C:OHAI (S:"OHAI-OK" / S:WTF)
 
 OHAI            = "OHAI" protocol hostname
 protocol        = STRING                  ; must be 'decide-host@1'
 hostname        = STRING
 
-use-peering     = C:PUB (S:ACK / S:DUP / error)
+use-peering     = C:PUB (S:ACK / S:DUP / S:RTFM)
                 / C:"HUGZ" S:"HUGZ-OK"
                 / S:"HUGZ" C:"HUGZ-OK"
 
@@ -45,22 +45,10 @@ DUP             = "DUP" message-id
 
 close-peering   = C:"KTHXBAI" / S:"KTHXBAI"
 
-error           = (S:WTF / S:RTFM)
 WTF             = "WTF" reason
 RTFM            = "RTFM" reason
 ```
 
-After connecting for the first time, the client must initiate peering by sending OHAI and its non-qualified hostname. The host must respond with OHAI-OK if the hostname is not taken by a currently-running client, or WTF if it is.
+After connecting for the first time, the client must initiate peering by sending OHAI and its non-qualified hostname. The host must respond with WTF if another connection is associated with the client; RTFM if the client's requested protocol is not supported; and otherwise it must respond with OHAI-OK.
 
-The client sends data to be stored to the host using PUB messages, which comprise the message type, a unique message identifier (to be determined by the client), and the message data, encoded as JSON.
-
-
-
-The host must also provide a second endpoint for connections from external
-clients, which may include other processes running on the host. Clients
-connected to the external endpoint may send REQ messages, which will be routed.
-The host must forward PUB messages from internal clients to external clients.
-
-Normal operation for a controller connected to a host is to forward all PUB
-messages for logging on the host. If controller dies, host should notify a
-human. If host dies, controller needs to start saving log messages.
+The client sends data to be stored to the host using PUB messages, which comprise the message type, a unique message identifier (to be determined by the client), and the message data, encoded as JSON. Recommended message identifiers are UUIDs or BSON ObjectIDs. The host must respond with an ACK if the message was successfully stored in the database, DUP if the message was a duplicate of a message already stored, or RTFM if the message failed to decode or the message type was not supported.
