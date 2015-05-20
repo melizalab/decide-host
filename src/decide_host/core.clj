@@ -10,8 +10,6 @@
 
 (def protocol "decide-host@1")
 (def config (json/parse-string (slurp "config/host-config.json") true))
-(def zmq-in (async/chan (async/sliding-buffer 64)))
-(def zmq-out (async/chan (async/sliding-buffer 64)))
 
 (defn to-string [x] (when-not (nil? x) (String. x)))
 (defn bytes-to-hex [x] (when-not (nil? x) (apply str (map #(format "%02x" %) x))))
@@ -28,36 +26,40 @@
 (defn connect!
   "Registers a controller as connected. :ok if successful, :wtf if the address is taken"
   [sock-id ctrl-addr]
-  (let [controller (db/get-controller-by-addr ctrl-addr)]
-    (if (or (nil? controller) (not (:alive controller)))
-      (do
-        (println "I:" ctrl-addr "connected")
-        (db/remove-controller! sock-id)
-        (db/add-controller! sock-id ctrl-addr)
-        :ok)
-      :wtf)))
+  (let [{:keys [alive zmq-id]} (db/get-controller-by-addr ctrl-addr)]
+    (match [alive zmq-id]
+           ;; another OHAI from existing client - noop
+           [true sock-id] :ok
+           ;; socket does not match controller
+           [true wrong-id] :wtf
+           ;; otherwise, drop old record and add new one
+           :else (do
+                   (println "I:" ctrl-addr "connected")
+                   (db/remove-controller! sock-id)
+                   (db/add-controller! sock-id ctrl-addr)
+                   :ok))))
 
 (defn disconnect!
   [sock-id]
   (when-let [controller (db/get-controller-by-socket sock-id)]
-    (println "I:" (:_id controller) "disconnected"))
-  (db/remove-controller! sock-id))
+    (println "I:" (:addr controller) "disconnected"))
+  (db/remove-controller! sock-id) nil)
 
 (defn connection-error!
   [controller]
-  (println "W:" (:_id controller) "disconnected unexpectedly")
+  (println "W:" (:addr controller) "disconnected unexpectedly")
   ;; TODO notify user
   (db/controller-alive! (:zmq-id controller) false))
 
 (defn check-connection
   [controller]
-  (let [{:keys [_id last-seen zmq-id]} controller
+  (let [{:keys [addr last-seen zmq-id]} controller
         {:keys [heartbeat-ms heartbeat-maxcount]} config
         interval (t/in-millis (t/interval last-seen (t/now)))]
-    (println "D:" _id "last seen" interval "ms ago")
+    (println "D:" addr "last seen" interval "ms ago")
       (cond
        (> interval (* heartbeat-maxcount heartbeat-ms)) (connection-error! controller)
-       (> interval heartbeat-ms) (async/put! zmq-in [zmq-id "HUGZ"]))))
+       (> interval heartbeat-ms) zmq-id)))
 
 (defn update-subject!
   [data]
@@ -71,7 +73,7 @@
 (defn store-data!
   [id data-type data-id data]
   (println "D:" data-type data)
-  (when-let [addr (:_id (db/get-controller-by-socket id))]
+  (when-let [addr (:addr (db/get-controller-by-socket id))]
     (when-let [data (decode-pub data)]
       (let [time (:time data)
             data (assoc data
@@ -115,27 +117,37 @@
            ["KTHXBAI" _ _ _] (disconnect! id)
 
            ;; error message
-           :else ["RTFM" "unrecognized command"])))
+           :else ["RTFM" (str "unrecognized command '" ps "'")])))
 
 
-(defn start-zmq-server [addr]
-  (register-socket! {:in zmq-in :out zmq-out :socket-type :router
-                     :configurator (fn [socket] (.bind socket addr))})
-  (println "I: bound decide-host to" addr)
-  (let [running (atom true)]
-    (async/go
-      (loop [[id & data] (<! zmq-out)]
-        (when-let [id (bytes-to-hex id)]
-          (when-let [result (apply process-message! id data)]
-            (println "D: sending" id result)
-            (>! zmq-in (cons (hex-to-bytes id) result)))
-          (recur (<! zmq-out))))
-      (println "I: released decide-host socket")
-      (reset! running false))
-    (async/go
-      (while @running
-        (<! (async/timeout (config :heartbeat-ms)))
-        (dorun (map check-connection (db/get-living-controllers)))))))
+(defn start-zmq-server
+  "Starts the zeromq server, which will bind to addr. Closing the returned input
+  channel will shut down the server."
+  [addr]
+  (let [zmq-in (async/chan (async/sliding-buffer 64))
+        zmq-out (async/chan (async/sliding-buffer 64))]
+    (register-socket! {:in zmq-in :out zmq-out :socket-type :router
+                       :configurator (fn [socket] (.bind socket addr))})
+    (println "I: bound decide-host to" addr)
+    (let [running (atom true)]
+      (async/go
+        (loop [[id & data] (<! zmq-out)]
+          (when-let [id (bytes-to-hex id)]
+            (when-let [result (apply process-message! id data)]
+              (println "D: sending" id result)
+              (>! zmq-in (cons (hex-to-bytes id) result)))
+            (recur (<! zmq-out))))
+        (println "I: released decide-host socket")
+        (reset! running false))
+      (async/go
+        (while @running
+          (<! (async/timeout (config :heartbeat-ms)))
+          (dorun (for [zmq-id (map check-connection (db/get-living-controllers))]
+                   (when zmq-id
+                     (println "D: sending" zmq-id "HUGZ")
+                     (async/put! zmq-in [(hex-to-bytes zmq-id) "HUGZ"])))))))
+    ;; return channel that will shut down the server
+    zmq-in))
 
 (defn -main
   "I don't do a whole lot ... yet."

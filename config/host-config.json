@@ -1,7 +1,7 @@
 {
     "addr-int": "tcp://localhost:5555",
     "heartbeat-ms": 2000,
-    "heartbeat-maxcount": 5,
+    "heartbeat-maxcount": 10,
     "addr-ext": "localhost",
     "port-ext": 8020,
     "admins": ["dmeliza@gmail.com"],

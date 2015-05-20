@@ -35,7 +35,9 @@
 (defn add-controller!
   [sock-id addr]
   (mc/update @db ctrl-coll
-             {:_id addr} {:zmq-id sock-id :alive true :last-seen (t/now)} {:upsert true}))
+             {:_id addr}
+             {:addr addr :zmq-id sock-id :alive true :last-seen (t/now)}
+             {:upsert true}))
 
 (defn remove-controller!
   "Removes controller from database"

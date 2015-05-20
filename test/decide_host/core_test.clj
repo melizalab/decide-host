@@ -53,6 +53,10 @@
         ;; will get fubared.
         (connect! sock-id "another-address") => :ok
         (count-controllers) => 1)
+    (fact "controllers can send duplicate connection messages"
+        (connect! sock-id addr) => :ok
+        (connect! sock-id addr) => :ok
+        (count-controllers) => 1)
     (fact "controllers can disconnect and reconnect"
         (connect! sock-id addr) => :ok
         (count-controllers) => 1
@@ -76,8 +80,8 @@
       (fact "accepts correct handshake"
           (process-message! sock-id "OHAI" protocol addr) => ["OHAI-OK"]
           (count-controllers) => 1)
-      (fact "does not accept duplicate connections"
-          (process-message! sock-id "OHAI" protocol addr) => (just ["WTF" anything])))
+      (fact "does not accept connections from other sockets when controller is alive"
+          (process-message! "other-id" "OHAI" protocol addr) => (just ["WTF" anything])))
     (fact "use-peering"
         (fact "responds to heartbeats"
             (process-message! sock-id "HUGZ") => ["HUGZ-OK"])
