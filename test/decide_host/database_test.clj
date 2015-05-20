@@ -27,9 +27,9 @@
         (get-controller-by-addr addr) => (contains {:zmq-id sock-id :alive true :_id addr})
         (get-controller-by-socket sock-id) => (contains {:zmq-id sock-id :alive true :_id addr})
         (count (get-living-controllers)) => 1
-        (updated-existing? (controller-alive! sock-id)) => truthy
+        (controller-alive! sock-id)
         (:last-seen (get-controller-by-addr addr)) => #(t/after? % tt)
-        (updated-existing? (controller-alive! sock-id false)) => truthy
+        (controller-alive! sock-id false)
         (count (get-living-controllers)) => 0)
     (fact "about subject state management"
         (fact "bad values return nil"
@@ -58,6 +58,6 @@
           (ok? (start-subject! subject data)) => truthy
           (get-procedure subject) => (:procedure data)
           (get-procedure "some-other-subject") => nil
-          (updated-existing? (controller-alive! sock-id false)) => truthy
+          (controller-alive! sock-id false)
           (get-procedure subject) => nil
           ))))

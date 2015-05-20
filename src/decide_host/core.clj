@@ -14,7 +14,8 @@
 (def zmq-out (async/chan (async/sliding-buffer 64)))
 
 (defn to-string [x] (when-not (nil? x) (String. x)))
-(defn to-hex [x] (when-not (nil? x) (apply str (map #(format "%02x" %) x))))
+(defn bytes-to-hex [x] (when-not (nil? x) (apply str (map #(format "%02x" %) x))))
+(defn hex-to-bytes [x] (.toByteArray (BigInteger. x 16)))
 (defn bad-message [msg] (println "E: bad message:" msg))
 
 (defn decode-pub
@@ -25,7 +26,7 @@
     (catch Exception e nil)))
 
 (defn connect!
-  "Registers a controller as connected. Returns true if successful, nil if the address is taken"
+  "Registers a controller as connected. :ok if successful, :wtf if the address is taken"
   [sock-id ctrl-addr]
   (let [controller (db/get-controller-by-addr ctrl-addr)]
     (if (or (nil? controller) (not (:alive controller)))
@@ -44,16 +45,16 @@
 
 (defn connection-error!
   [controller]
-  (println "E: controller" (:_id controller) "disconnected unexpectedly")
+  (println "W:" (:_id controller) "disconnected unexpectedly")
   ;; TODO notify user
   (db/controller-alive! (:zmq-id controller) false))
 
 (defn check-connection
   [controller]
-  (let [{:keys [last-seen zmq-id]} controller
+  (let [{:keys [_id last-seen zmq-id]} controller
         {:keys [heartbeat-ms heartbeat-maxcount]} config
         interval (t/in-millis (t/interval last-seen (t/now)))]
-    (println "D:" zmq-id "last seen" interval "ms ago")
+    (println "D:" _id "last seen" interval "ms ago")
       (cond
        (> interval (* heartbeat-maxcount heartbeat-ms)) (connection-error! controller)
        (> interval heartbeat-ms) (async/put! zmq-in [zmq-id "HUGZ"]))))
@@ -85,14 +86,15 @@
   [id & data]
   (let [[ps s1 s2 s3] (map to-string data)
         right-protocol protocol]
+    (println "D: received" id ps s1 s2 s3)
     (match [ps s1 s2 s3]
            ;; open-peering
-           ["OHAI" right-protocol addr _]
+           ["OHAI" right-protocol (addr :guard (complement nil?)) _]
            (case (connect! id addr)
              :ok ["OHAI-OK"]
              :wtf ["WTF" (str addr " is already connected")])
            ["OHAI" wrong-protocol _ _]
-           ["RTFM" (str " server supports " protocol)]
+           ["RTFM" (str "wrong protocol or handshake")]
 
            ;; use-peering
            ["PUB" data-type data-id data-str]
@@ -123,9 +125,10 @@
   (let [running (atom true)]
     (async/go
       (loop [[id & data] (<! zmq-out)]
-        (when-let [id (to-hex id)]
+        (when-let [id (bytes-to-hex id)]
           (when-let [result (apply process-message! id data)]
-            (>! zmq-in (cons id result)))
+            (println "D: sending" id result)
+            (>! zmq-in (cons (hex-to-bytes id) result)))
           (recur (<! zmq-out))))
       (println "I: released decide-host socket")
       (reset! running false))

@@ -27,6 +27,10 @@
     (to-string "a-string") => "a-string"
     (to-string (.getBytes "a-string")) => "a-string")
 
+(fact "to-hex converts to and from hex representations of a byte array"
+    (let [x "abracadabra"]
+      (to-string (hex-to-bytes (bytes-to-hex (.getBytes x)))) => x))
+
 (fact "decode-pub correctly handles correct and incorrect JSON"
     (decode-pub nil) => nil
     (decode-pub "garbage") => nil
@@ -52,12 +56,12 @@
     (fact "controllers can disconnect and reconnect"
         (connect! sock-id addr) => :ok
         (count-controllers) => 1
-        (disconnect! sock-id) => truthy
+        (disconnect! sock-id)
         (count-controllers) => 0
         (connect! sock-id addr) => :ok)
     (fact "controllers can reconnect after errors"
         (connect! sock-id addr) => :ok
-        (connection-error! (db/get-controller-by-addr addr)) => truthy
+        (connection-error! (db/get-controller-by-addr addr))
         (count-controllers) => 0
         (connect! sock-id addr) => :ok))
   (fact "processing incoming messages"

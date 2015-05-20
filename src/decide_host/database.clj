@@ -47,8 +47,9 @@
 
 (defn controller-alive!
   "Updates database with connection status of controller"
-  ([sock-id] (update-controller! sock-id {:alive true :last-seen (t/now)}))
-  ([sock-id alive] (update-controller! sock-id {:alive alive})))
+  ([sock-id] (update-controller! sock-id {:alive true :last-seen (t/now)}) nil)
+  ([sock-id alive] (update-controller! sock-id {:alive alive}) nil))
+
 
 (defn get-controller-by-socket [sock-id] (mc/find-one-as-map @db ctrl-coll {:zmq-id sock-id}))
 (defn get-controller-by-addr [addr] (when addr (mc/find-map-by-id @db ctrl-coll addr)))
