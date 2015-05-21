@@ -53,15 +53,18 @@
 ;; most of the request-reply logic is tested in core-test and is not duplicated
 ;; here. Mostly we want to check that heartbeating works as expected
 
-(fact-group :integration "client-server integration"
+#_(fact-group :integration "client-server integration"
   (let [{:keys [in out]} (connect-client server-address)
-        srv-in (start-server server-address)]
+        srv-in (start-server server-address)
+        hugz (hugger in out)]
     (fact "client connects to server"
         (req in out "OHAI" protocol "test") => "OHAI-OK")
     (fact "client receives heartbeats"
-        (let [hugz (hugger in out)]
-          (<!! (async/timeout 4000))    ; wait for a few messages to accumulate
-          @hugz =not=> 0))
+      (<!! (async/timeout 4000))    ; wait for a few messages to accumulate
+      @hugz =not=> 0)
+    (fact "server survives client timeout"
+        (reset! hugz -2)              ; shuts down the loop
+        (<!! (async/timeout 25000)))
     (fact "server doesn't acknowledge disconnect"
         (req in out "KTHXBAI") => nil)
     (async/close! srv-in)

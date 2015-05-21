@@ -92,17 +92,6 @@
           (process-message! sock-id "PUB" "trial-data" data-id
                             trial-msg) => (just ["ACK" data-id])
           (mc/count db db/trial-coll {:_id data-id}) => 1))
-    (let [data {:name "experiment"
-                :time 1432069827152495
-                :procedure procedure
-                :subject subject}]
-      (fact "registers subject from experiment events"
-        (db/get-procedure subject) => nil
-        (process-message! sock-id "PUB" "state-changed" "expt-1" (json/encode data))
-        (db/get-procedure subject) => procedure
-        (process-message! sock-id "PUB" "state-changed" "expt-2"
-                          (json/encode (assoc data :procedure nil :subject nil)))
-        (db/get-procedure subject) => nil))
     (fact "close-peering"
         (fact "goodbye unregisters controller"
             (process-message! sock-id "KTHXBAI")

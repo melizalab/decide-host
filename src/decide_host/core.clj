@@ -1,6 +1,7 @@
 (ns decide-host.core
   (:gen-class)
   (:require [decide-host.database :as db]
+            [decide-host.handlers :as h]
             [com.keminglabs.zmq-async.core :refer [register-socket!]]
             [clojure.core.async :as async :refer [>! <! >!! <!!]]
             [clojure.core.match :refer [match]]
@@ -10,16 +11,32 @@
 
 (def protocol "decide-host@1")
 (def config (json/parse-string (slurp "config/host-config.json") true))
-(def INIT-ALIVE (get config :heartbeat-max-ping 10))
+(def ^:private INIT-ALIVE (get config :heartbeat-max-ping 10))
 (def version (-> "project.clj" slurp read-string (nth 2)))
-
-;; channel and publication used to distribute non-core processing of events
-(def ^:private events (async/chan 64))
-(def ^:private events-pub (async/pub events :topic))
 
 (defn to-string [x] (when-not (nil? x) (String. x)))
 (defn bytes-to-hex [x] (when-not (nil? x) (apply str (map #(format "%02x" %) x))))
 (defn hex-to-bytes [x] (.toByteArray (BigInteger. x 16)))
+
+;; channel and publication used to distribute non-core processing of events
+;; note that events may get dropped on this channel
+(def ^:private events (async/chan (async/sliding-buffer 64)))
+(def ^:private events-pub (async/pub events :topic))
+
+(defn pub
+  "Publishes an event to subscribers. Data should be a map"
+  [topic data]
+  (async/put! events (assoc data :topic (keyword topic))))
+
+(defn add-handler
+  "Adds an asynchronous handler f for topic"
+  [topic f]
+  (let [chan (async/chan)]
+    #_(println "D: subscribing" f "to" topic)
+    (async/sub events-pub topic chan)
+    (async/go-loop []
+      (f (<! chan))
+      (recur))))
 
 (defn decode-pub
   "Decodes payload of a PUB message, returning nil on errors"
@@ -27,16 +44,6 @@
   (try
     (json/parse-string (to-string bytes) true)
     (catch Exception e nil)))
-
-;; TODO can be decoupled with channel
-(defn update-subject!
-  [data]
-  (let [{:keys [name subject procedure user addr time]} data]
-    (when (= name "experiment")
-      (if-not (nil? subject)
-        (db/start-subject! subject {:procedure procedure :controller addr
-                                    :user user :start-time time})
-        (db/stop-subject! addr time)))))
 
 (defn controller-alive!
   "Updates database with connection status of controller"
@@ -68,7 +75,7 @@
       )
     (db/remove-controller! sock-id)) nil)
 
-(defn check-connection
+(defn check-connection!
   [controller]
   (let [{:keys [addr alive last-seen zmq-id]} controller
         {:keys [heartbeat-ms]} config
@@ -94,7 +101,7 @@
                         :addr addr
                         :time (tc/from-long (long (/ time 1000)))
                         :usec (mod time 1000))]
-        (update-subject! data)
+        (pub data-type data)
         (db/log-message! data-type data-id data))
       :rtfm-fmt)
     :who?))
@@ -149,10 +156,11 @@
       (async/go
         (while @running
           (<! (async/timeout (config :heartbeat-ms)))
-          (dorun (for [zmq-id (map check-connection (db/get-controllers))]
+          (dorun (for [zmq-id (map check-connection! (db/get-controllers))]
                    (when zmq-id
-                     (println "D: sending" zmq-id "HUGZ")
+                     #_(println "D: sending" zmq-id "HUGZ")
                      (async/put! zmq-in [(hex-to-bytes zmq-id) "HUGZ"]))))))
+      (add-handler :state-changed h/update-subject!)
       ;; main handler runs in its own thread so that process continues when main
       ;; thread terminates in app
       (doto (Thread. (fn []
