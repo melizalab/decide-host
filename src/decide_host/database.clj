@@ -103,4 +103,4 @@
                                         (convert-subject-uuid data)
                                         {:upsert true}))
         :dup :ack))
-    (catch IllegalArgumentException e :rtfm)))
+    (catch IllegalArgumentException e :rtfm-dtype)))

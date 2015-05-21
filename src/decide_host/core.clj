@@ -13,6 +13,10 @@
 (def INIT-ALIVE (get config :heartbeat-max-ping 10))
 (def version (-> "project.clj" slurp read-string (nth 2)))
 
+;; channel and publication used to distribute non-core processing of events
+(def ^:private events (async/chan 64))
+(def ^:private events-pub (async/pub events :topic))
+
 (defn to-string [x] (when-not (nil? x) (String. x)))
 (defn bytes-to-hex [x] (when-not (nil? x) (apply str (map #(format "%02x" %) x))))
 (defn hex-to-bytes [x] (.toByteArray (BigInteger. x 16)))
@@ -24,11 +28,6 @@
     (json/parse-string (to-string bytes) true)
     (catch Exception e nil)))
 
-;; TODO can be decoupled
-(defn controller-alive!
-  "Updates database with connection status of controller"
-  [sock-id] (db/update-controller! sock-id {:alive INIT-ALIVE :last-seen (t/now)}) nil)
-
 ;; TODO can be decoupled with channel
 (defn update-subject!
   [data]
@@ -38,6 +37,10 @@
         (db/start-subject! subject {:procedure procedure :controller addr
                                     :user user :start-time time})
         (db/stop-subject! addr time)))))
+
+(defn controller-alive!
+  "Updates database with connection status of controller"
+  [sock-id] (db/update-controller! sock-id {:alive INIT-ALIVE :last-seen (t/now)}) nil)
 
 (defn connect!
   "Registers a controller as connected. :ok if successful, :wtf if the address is taken"
@@ -81,20 +84,26 @@
                                   zmq-id))))
 
 (defn store-data!
+  "Stores PUB data in the database. Returns :ack on success, :dup for duplicate
+  messages (which are ignored, :rtfm for unsupported data types, and nil for
+  invalid/unparseable data"
   [id data-type data-id data]
   #_(println "D: storing data" id data-type data-id data)
-  (when-let [addr (:addr (db/get-controller-by-socket id))]
-    (when-let [data (decode-pub data)]
+  (controller-alive! id)
+  (if-let [addr (:addr (db/get-controller-by-socket id))]
+    (if-let [data (decode-pub data)]
       (let [time (:time data)
             data (assoc data
                         :addr addr
                         :time (tc/from-long (long (/ time 1000)))
                         :usec (mod time 1000))]
         (update-subject! data)
-        (db/log-message! data-type data-id data)))))
+        (db/log-message! data-type data-id data))
+      :rtfm-fmt)
+    :rtfm-who?))
 
-;;; the zmq message handler
 (defn process-message!
+  "Processes decide-host messages from clients. Returns the reply message."
   [id & data]
   (let [[ps s1 s2 s3] (map to-string data)
         right-protocol protocol]
@@ -110,13 +119,12 @@
 
            ;; use-peering
            ["PUB" data-type data-id data-str]
-           (do
-             (controller-alive! id)
-             (case (store-data! id data-type data-id data-str)
-               :ack ["ACK" data-id]
-               :dup ["DUP" data-id]
-               :rtfm ["RTFM" (str "unsupported data type " data-type)]
-               ["RTFM" "data sent before handshake"]))
+           (case (store-data! id data-type data-id data-str)
+             :ack ["ACK" data-id]
+             :dup ["DUP" data-id]
+             :rtfm-dtype ["RTFM" (str "unsupported data type " data-type)]
+             :rtfm-who?  ["RTFM" "data sent before handshake"]
+             :rtfm-fmt   ["RTFM" "error parsing data"])
            ["HUGZ" _ _ _]
            (do
              (controller-alive! id)
@@ -130,13 +138,13 @@
            :else ["RTFM" (str "unrecognized command '" ps "'")])))
 
 (defn start-zmq-server
-  "Starts the zeromq server, which will bind to addr. Closing the returned input
-  channel will shut down the server."
+  "Starts a server that will bind a zeromq socket to addr. Received messages are
+  passed to process-message!. A separate event loop sends heartbeats to
+  connected clients. Closing the returned input channel will shut down the
+  server."
   [addr]
   (let [zmq-in (async/chan (async/sliding-buffer 64))
-        zmq-out (async/chan (async/sliding-buffer 64))
-        events (async/chan 64)
-        events-pub (async/pub events :topic)]
+        zmq-out (async/chan (async/sliding-buffer 64))]
     (register-socket! {:in zmq-in :out zmq-out :socket-type :router
                        :configurator (fn [socket] (.bind socket addr))})
     (println "I: bound decide-host to" addr)
@@ -161,9 +169,8 @@
                        (reset! running false)))
         (.setName "decide-host message handler")
         (.start)))
-    ;; return some useful functions will shut down the server
-    {:shutdown #(async/close! zmq-in)
-     :sub (partial async/sub events-pub)}))
+    ;; return input channel of server; closing this will terminate the server
+    zmq-in))
 
 (defn -main
   "I don't do a whole lot ... yet."
