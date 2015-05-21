@@ -29,14 +29,14 @@
   (async/put! events (assoc data :topic (keyword topic))))
 
 (defn add-handler
-  "Adds an asynchronous handler f for topic"
-  [topic f]
-  (let [chan (async/chan)]
-    #_(println "D: subscribing" f "to" topic)
-    (async/sub events-pub topic chan)
-    (async/go-loop []
-      (f (<! chan))
-      (recur))))
+  "Adds an asynchronous handler f for one or more topics"
+  [f & topics]
+  (when-let [tops (seq topics)]
+    (let [chan (async/chan)]
+      (dorun (map #(async/sub events-pub % chan) topics))
+      (async/go-loop []
+        (f (<! chan))
+        (recur)))))
 
 (defn decode-pub
   "Decodes payload of a PUB message, returning nil on errors"
@@ -160,7 +160,7 @@
                    (when zmq-id
                      #_(println "D: sending" zmq-id "HUGZ")
                      (async/put! zmq-in [(hex-to-bytes zmq-id) "HUGZ"]))))))
-      (add-handler :state-changed h/update-subject!)
+      (add-handler h/update-subject! :state-changed :trial-data)
       ;; main handler runs in its own thread so that process continues when main
       ;; thread terminates in app
       (doto (Thread. (fn []

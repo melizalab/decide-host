@@ -86,8 +86,12 @@
 
 (defn update-subject!
   "Updates subject record in database"
-  [query data]
-  (mc/update @db subj-coll query {$set data}))
+  [subject data]
+  (mc/update-by-id @db subj-coll (uuid subject) {$set data}))
+
+(defn update-subject-by-controller!
+  [addr data]
+  (mc/update @db subj-coll {:controller addr} {$set data}))
 
 (defn get-subject [subject] (when subject (mc/find-map-by-id @db subj-coll (uuid subject))))
 (defn get-subject-by-addr [addr] (mc/find-one-as-map @db subj-coll {:controller addr}))
