@@ -5,7 +5,8 @@
             [monger.result :refer [ok? updated-existing?]]
             [monger.operators :refer :all]
             [clj-time.core :as t])
-  (:import [org.bson.types ObjectId]))
+  (:import [org.bson.types ObjectId]
+           [java.util UUID]))
 
 ;; collection names
 (def event-coll "events")
@@ -22,6 +23,20 @@
   ([] (ObjectId.))
   ([x] (try (ObjectId. x)
             (catch IllegalArgumentException e x))))
+
+(defn uuid
+  "Converts s to UUID type if possible. Otherwise returns the original argument"
+  [s]
+  (try (UUID/fromString s)
+       (catch IllegalArgumentException e s)
+       (catch NullPointerException e s)))
+
+(defn convert-subject-uuid
+  "Attempts to convert :subject field if present to a uuid"
+  [map]
+  (if-let [subj (uuid (:subject map))]
+    (assoc map :subject subj)
+    map))
 
 (defn connect!
   "Connect to a mongodb database"
@@ -58,7 +73,7 @@
 (defn start-subject!
   "Updates database when subject starts running an experiment"
   [subject data]
-  (mc/update @db subj-coll {:_id subject} {$set data} {:upsert true}))
+  (mc/update @db subj-coll {:_id (uuid subject)} {$set data} {:upsert true}))
 
 (defn stop-subject!
   "Updates database when subject stops running an experiment"
@@ -67,7 +82,7 @@
                           {:controller addr}
                           {$set {:controller nil :procedure nil :stop-time time} })))
 
-(defn get-subject [subject] (when subject (mc/find-map-by-id @db subj-coll subject)))
+(defn get-subject [subject] (when subject (mc/find-map-by-id @db subj-coll (uuid subject))))
 (defn get-subject-by-addr [addr] (mc/find-one-as-map @db subj-coll {:controller addr}))
 (defn get-procedure
   "Gets currently running experiment for subject iff the associated controller is alive"
@@ -82,6 +97,9 @@
                     "state-changed" event-coll
                     "trial-data" trial-coll)
           obj-id (object-id data-id)]
-      (if (updated-existing? (mc/update @db coll {:_id obj-id} data {:upsert true}))
+      (if (updated-existing? (mc/update @db coll
+                                        {:_id obj-id}
+                                        (convert-subject-uuid data)
+                                        {:upsert true}))
         :dup :ack))
     (catch IllegalArgumentException e :rtfm)))

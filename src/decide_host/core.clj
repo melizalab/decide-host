@@ -18,6 +18,7 @@
 (defn hex-to-bytes [x] (.toByteArray (BigInteger. x 16)))
 (defn bad-message [msg] (println "E: bad message:" msg))
 
+
 (defn decode-pub
   "Decodes payload of a PUB message, returning nil on errors"
   [bytes]
