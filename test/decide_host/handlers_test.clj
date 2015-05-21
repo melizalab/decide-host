@@ -25,6 +25,7 @@
         (db/update-controller! sock-id {:alive 10})
         (db/get-procedure subject) => nil
         (update-subject! data)
-        (db/get-procedure subject) => procedure
-        (update-subject! (assoc data :subject nil))
-        (db/get-procedure subject) => nil)))
+        (db/get-procedure subject) => procedure)
+    (fact "update-subject updates last-active for keypresses"
+        (update-subject! {:topic :state-changed :name "keys" :addr addr :time 1234})
+        (db/get-subject subject) => (contains {:last-active 1234}))))

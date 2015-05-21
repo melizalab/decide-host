@@ -84,6 +84,11 @@
                           {:controller addr}
                           {$set {:controller nil :procedure nil :stop-time time} })))
 
+(defn update-subject!
+  "Updates subject record in database"
+  [query data]
+  (mc/update @db subj-coll query {$set data}))
+
 (defn get-subject [subject] (when subject (mc/find-map-by-id @db subj-coll (uuid subject))))
 (defn get-subject-by-addr [addr] (mc/find-one-as-map @db subj-coll {:controller addr}))
 (defn get-procedure

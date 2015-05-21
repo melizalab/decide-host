@@ -19,4 +19,7 @@
              (db/start-subject! s {:procedure p :controller a :user u :start-time t})
              (db/stop-subject! a t))
 
+         [{:topic :state-changed :name "keys" :addr a :time t}]
+         (db/update-subject! {:controller a} {:last-active t})
+
          :else nil))
