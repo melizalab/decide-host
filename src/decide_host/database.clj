@@ -70,6 +70,7 @@
 (defn get-controller-by-socket [sock-id] (mc/find-one-as-map @db ctrl-coll {:zmq-id sock-id}))
 (defn get-controller-by-addr [addr] (mc/find-one-as-map @db ctrl-coll {:addr addr}))
 (defn get-living-controllers [] (mc/find-maps @db ctrl-coll {:alive {$gt 0}}))
+(defn get-controllers [] (mc/find-maps @db ctrl-coll))
 
 (defn start-subject!
   "Updates database when subject starts running an experiment"

@@ -68,7 +68,7 @@
         (process-message! sock-id "WHODAT") => (just ["RTFM" anything]))
     (fact "unpeered PUB messages rejected"
         (process-message! sock-id "PUB" "state-changed" data-id
-                            event-msg) => (just ["RTFM" anything]))
+                          event-msg) => (just ["WHO?"]))
     (fact "open-peering"
         (fact "rejects wrong protocol"
             (process-message! sock-id "OHAI" "garble") => (just ["RTFM" anything]))

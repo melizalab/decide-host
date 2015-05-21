@@ -59,17 +59,14 @@
                    :ok))))
 
 (defn disconnect!
-  [sock-id]
-  (when-let [controller (db/get-controller-by-socket sock-id)]
-    (println "I:" (:addr controller) "disconnected"))
-  (db/remove-controller! sock-id) nil)
-
-
-(defn connection-error!
-  [controller]
-  ;; TODO notify user by email
-  (println "W:" (:addr controller) "disconnected unexpectedly")
-  #_(db/remove-controller! sock-id))
+  [sock-id & flags]
+  (let [flags (set flags)
+        err (:err flags)]
+    (when-let [controller (db/get-controller-by-socket sock-id)]
+      (println "I:" (:addr controller) "disconnected" (if err "unexpectedly" ""))
+      ;; TODO notify user if error
+      )
+    (db/remove-controller! sock-id)) nil)
 
 (defn check-connection
   [controller]
@@ -78,7 +75,7 @@
         interval (t/in-millis (t/interval last-seen (t/now)))]
     #_(println "D:" addr "last seen" interval "ms ago")
     (cond
-      (not (pos? alive)) (connection-error! controller)
+      (not (pos? alive)) (disconnect! zmq-id :err)
       (> interval heartbeat-ms) (do
                                   (db/dec-alive! zmq-id)
                                   zmq-id))))
@@ -100,7 +97,7 @@
         (update-subject! data)
         (db/log-message! data-type data-id data))
       :rtfm-fmt)
-    :rtfm-who?))
+    :who?))
 
 (defn process-message!
   "Processes decide-host messages from clients. Returns the reply message."
@@ -123,7 +120,7 @@
              :ack ["ACK" data-id]
              :dup ["DUP" data-id]
              :rtfm-dtype ["RTFM" (str "unsupported data type " data-type)]
-             :rtfm-who?  ["RTFM" "data sent before handshake"]
+             :who?  ["WHO?"]
              :rtfm-fmt   ["RTFM" "error parsing data"])
            ["HUGZ" _ _ _]
            (do
@@ -152,9 +149,9 @@
       (async/go
         (while @running
           (<! (async/timeout (config :heartbeat-ms)))
-          (dorun (for [zmq-id (map check-connection (db/get-living-controllers))]
+          (dorun (for [zmq-id (map check-connection (db/get-controllers))]
                    (when zmq-id
-                     #_(println "D: sending" zmq-id "HUGZ")
+                     (println "D: sending" zmq-id "HUGZ")
                      (async/put! zmq-in [(hex-to-bytes zmq-id) "HUGZ"]))))))
       ;; main handler runs in its own thread so that process continues when main
       ;; thread terminates in app
