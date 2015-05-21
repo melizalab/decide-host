@@ -64,5 +64,5 @@
           @hugz =not=> 0))
     (fact "server doesn't acknowledge disconnect"
         (req in out "KTHXBAI") => nil)
-    (async/close! srv-in)
+    ((:shutdown srv-in))
     (async/close! in)))

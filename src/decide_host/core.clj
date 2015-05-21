@@ -16,8 +16,6 @@
 (defn to-string [x] (when-not (nil? x) (String. x)))
 (defn bytes-to-hex [x] (when-not (nil? x) (apply str (map #(format "%02x" %) x))))
 (defn hex-to-bytes [x] (.toByteArray (BigInteger. x 16)))
-(defn bad-message [msg] (println "E: bad message:" msg))
-
 
 (defn decode-pub
   "Decodes payload of a PUB message, returning nil on errors"
@@ -25,6 +23,21 @@
   (try
     (json/parse-string (to-string bytes) true)
     (catch Exception e nil)))
+
+;; TODO can be decoupled
+(defn controller-alive!
+  "Updates database with connection status of controller"
+  [sock-id] (db/update-controller! sock-id {:alive INIT-ALIVE :last-seen (t/now)}) nil)
+
+;; TODO can be decoupled with channel
+(defn update-subject!
+  [data]
+  (let [{:keys [name subject procedure user addr time]} data]
+    (when (= name "experiment")
+      (if-not (nil? subject)
+        (db/start-subject! subject {:procedure procedure :controller addr
+                                    :user user :start-time time})
+        (db/stop-subject! addr time)))))
 
 (defn connect!
   "Registers a controller as connected. :ok if successful, :wtf if the address is taken"
@@ -35,11 +48,11 @@
            [(_ :guard pos?) sock-id] :ok
            ;; socket does not match controller
            [(_ :guard pos?) wrong-id] :wtf
-           ;; otherwise, drop old record and add new one
+           ;; otherwise, add or update existing record
            :else (do
                    (println "I:" ctrl-addr "connected")
-                   (db/remove-controller! sock-id)
-                   (db/add-controller! sock-id ctrl-addr :alive INIT-ALIVE)
+                   (db/add-controller! sock-id ctrl-addr)
+                   (controller-alive! sock-id)
                    :ok))))
 
 (defn disconnect!
@@ -48,15 +61,12 @@
     (println "I:" (:addr controller) "disconnected"))
   (db/remove-controller! sock-id) nil)
 
-(defn controller-alive!
-  "Updates database with connection status of controller"
-  [sock-id] (db/update-controller! sock-id {:alive INIT-ALIVE :last-seen (t/now)}) nil)
 
 (defn connection-error!
   [controller]
+  ;; TODO notify user by email
   (println "W:" (:addr controller) "disconnected unexpectedly")
-  ;; TODO notify user
-  #_(db/controller-alive! (:zmq-id controller) 0))
+  #_(db/remove-controller! sock-id))
 
 (defn check-connection
   [controller]
@@ -69,15 +79,6 @@
       (> interval heartbeat-ms) (do
                                   (db/dec-alive! zmq-id)
                                   zmq-id))))
-
-(defn update-subject!
-  [data]
-  (let [{:keys [name subject procedure user addr time]} data]
-    (when (= name "experiment")
-      (if-not (nil? subject)
-        (db/start-subject! subject {:procedure procedure :controller addr
-                                    :user user :start-time time})
-        (db/stop-subject! addr time)))))
 
 (defn store-data!
   [id data-type data-id data]
@@ -128,24 +129,14 @@
            ;; error message
            :else ["RTFM" (str "unrecognized command '" ps "'")])))
 
-(defn message-handler
-  [zmq-in zmq-out running]
-  (fn []
-        (loop [[id & data] (<!! zmq-out)]
-          (when-let [id (bytes-to-hex id)]
-            (when-let [result (apply process-message! id data)]
-              #_(println "D: sending" id result)
-              (>!! zmq-in (cons (hex-to-bytes id) result)))
-            (recur (<!! zmq-out))))
-        (println "I: released decide-host socket")
-        (reset! running false)))
-
 (defn start-zmq-server
   "Starts the zeromq server, which will bind to addr. Closing the returned input
   channel will shut down the server."
   [addr]
   (let [zmq-in (async/chan (async/sliding-buffer 64))
-        zmq-out (async/chan (async/sliding-buffer 64))]
+        zmq-out (async/chan (async/sliding-buffer 64))
+        events (async/chan 64)
+        events-pub (async/pub events :topic)]
     (register-socket! {:in zmq-in :out zmq-out :socket-type :router
                        :configurator (fn [socket] (.bind socket addr))})
     (println "I: bound decide-host to" addr)
@@ -157,11 +148,22 @@
                    (when zmq-id
                      #_(println "D: sending" zmq-id "HUGZ")
                      (async/put! zmq-in [(hex-to-bytes zmq-id) "HUGZ"]))))))
-      (doto (Thread. (message-handler zmq-in zmq-out running))
+      ;; main handler runs in its own thread so that process continues when main
+      ;; thread terminates in app
+      (doto (Thread. (fn []
+                       (loop [[id & data] (<!! zmq-out)]
+                         (when-let [id (bytes-to-hex id)]
+                           (when-let [result (apply process-message! id data)]
+                             #_(println "D: sending" id result)
+                             (>!! zmq-in (cons (hex-to-bytes id) result)))
+                           (recur (<!! zmq-out))))
+                       (println "I: released decide-host socket")
+                       (reset! running false)))
         (.setName "decide-host message handler")
         (.start)))
-    ;; return channel that will shut down the server
-    zmq-in))
+    ;; return some useful functions will shut down the server
+    {:shutdown #(async/close! zmq-in)
+     :sub (partial async/sub events-pub)}))
 
 (defn -main
   "I don't do a whole lot ... yet."

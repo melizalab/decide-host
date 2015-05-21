@@ -44,14 +44,15 @@
   (let [res (mg/connect-via-uri uri)]
     (mg/get-db-names (:conn res))       ; will throw error for bad connection
     (println "I: connected to database at" uri)
+    ;; ensure indices here or in a setup script?
     (reset! db (:db res))
     res))
 
 (defn add-controller!
   [sock-id addr & kv]
   (mc/update @db ctrl-coll
-             {:_id addr}
-             (apply assoc {:addr addr :zmq-id sock-id} :last-seen (t/now) kv)
+             {:zmq-id sock-id}
+             (apply assoc {:addr addr} :zmq-id sock-id kv)
              {:upsert true}))
 
 (defn remove-controller!
@@ -67,7 +68,7 @@
   [sock-id] (mc/update @db ctrl-coll {:zmq-id sock-id} {$inc {:alive -1}}))
 
 (defn get-controller-by-socket [sock-id] (mc/find-one-as-map @db ctrl-coll {:zmq-id sock-id}))
-(defn get-controller-by-addr [addr] (when addr (mc/find-map-by-id @db ctrl-coll addr)))
+(defn get-controller-by-addr [addr] (mc/find-one-as-map @db ctrl-coll {:addr addr}))
 (defn get-living-controllers [] (mc/find-maps @db ctrl-coll {:alive {$gt 0}}))
 
 (defn start-subject!
@@ -88,7 +89,7 @@
   "Gets currently running experiment for subject iff the associated controller is alive"
   [subject]
   (let [{:keys [controller procedure]} (get-subject subject)
-        ctrl (mc/find-one-as-map @db ctrl-coll {:_id controller :alive {$gt 0}})]
+        ctrl (mc/find-one-as-map @db ctrl-coll {:addr controller :alive {$gt 0}})]
     (when ctrl procedure)))
 
 (defn log-message! [data-type data-id data]

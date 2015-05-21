@@ -37,9 +37,10 @@
               (get-controller-by-socket nil) => nil
               (get-controller-by-addr addr) => nil
               (get-controller-by-socket sock-id) => nil)
-        (ok? (add-controller! sock-id addr :alive INIT-ALIVE)) => truthy
-        (get-controller-by-addr addr) => (contains {:zmq-id sock-id :alive INIT-ALIVE :_id addr})
-        (get-controller-by-socket sock-id) => (contains {:zmq-id sock-id :alive INIT-ALIVE :_id addr})
+        (add-controller! sock-id addr)
+        (get-controller-by-addr addr) => (contains {:zmq-id sock-id :addr addr})
+        (get-controller-by-socket sock-id) => (contains {:zmq-id sock-id :addr addr})
+        (update-controller! sock-id {:alive INIT-ALIVE})
         (count (get-living-controllers)) => 1
         (update-controller! sock-id {:alive 0})
         (count (get-living-controllers)) => 0
@@ -49,11 +50,11 @@
               (get-subject nil) => nil
               (get-subject subject) => nil)
         (let [data {:controller addr :procedure "testing"}]
-          (ok? (start-subject! subject data)) => truthy
+          (start-subject! subject data)
           ;; TODO fix time equality checks
           (get-subject subject) => (contains data)
           (get-subject-by-addr (:controller data)) => (contains data)
-          (ok? (stop-subject! addr)) => truthy
+          (stop-subject! addr)
           (get-subject subject) => (contains {:controller nil :procedure nil})))
     (fact "about logging messages"
         (let [oid (.toString (object-id))
@@ -67,8 +68,9 @@
           (mc/count db event-coll {:subject "acde"}) => 1))
     (fact "about integrated subject/controller state"
         (let [data {:controller addr :procedure "testing"}]
-          (ok? (add-controller! sock-id addr :alive INIT-ALIVE)) => truthy
-          (ok? (start-subject! subject data)) => truthy
+          (add-controller! sock-id addr)
+          (update-controller! sock-id {:alive INIT-ALIVE})
+          (start-subject! subject data)
           (get-procedure subject) => (:procedure data)
           (get-procedure "some-other-subject") => nil
           (update-controller! sock-id {:alive 0})
