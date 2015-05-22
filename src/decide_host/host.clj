@@ -9,7 +9,7 @@
             [clj-time.coerce :as tc]
             [cheshire.core :as json]))
 
-(defn get-config [& ks] (get-in (config) (cons :zmq ks)))
+(defn get-config [& ks] (get-in (config) (cons :host ks)))
 (def version (-> "project.clj" slurp read-string (nth 2)))
 
 (defn to-string [x] (when-not (nil? x) (String. x)))
@@ -185,15 +185,3 @@
 (defn stop! [context]
   (async/close! (get-in context [:server :in]))
   (async/put! (get-in context [:heartbeat :ctrl]) :stop))
-
-
-#_(defn -main
-  "I don't do a whole lot ... yet."
-  [& args]
-  (println "I: this is decide-host, version" version)
-  (db/connect! (:log-db config))
-  (start-zmq-server (:addr-int config))
-  ;; this doesn't seem to work
-  #_(let [server ]
-    (.addShutdownHook (Runtime/getRuntime)
-                      (Thread. #(async/close! server)))))
