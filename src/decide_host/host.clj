@@ -86,7 +86,7 @@
   (let [{{db :db} :database} context
         [ps s1 s2 s3] (map to-string data)
         right-protocol (get-config :protocol)]
-    (println "D: received" id ps s1 s2 s3)
+    #_(println "D: received" id ps s1 s2 s3)
     (match [ps s1 s2 s3]
            ;; open-peering
            ["OHAI" right-protocol (addr :guard (complement nil?)) _]
@@ -126,7 +126,7 @@
       (loop [[id & data] (<!! zout)]
         (when-let [id (bytes-to-hex id)]
           (when-let [result (apply process-message! ctx id data)]
-            (println "D: sending" id result)
+            #_(println "D: sending" id result)
             (>!! zin (cons (hex-to-bytes id) result)))
           (recur (<!! zout))))
       (println "I: released decide-host socket")
@@ -151,16 +151,15 @@
 (defn start-heartbeat
   [context interval]
   (let [{{zin :in} :server {db :db} :database} context
-        state (atom {:running true
-                     :interval interval})]
+        ctrl-chan (async/chan)]
     (async/go
-      (loop [{:keys [running interval]} @state]
-        (when running
-          (<! (async/timeout interval))
-          (dorun (map check-connection! (repeat context) (db/get-controllers db)))
-          (recur @state)))
-      (println "D: heartbeat handler stopping"))
-    state))
+      (loop []
+        (let [[x _] (async/alts! [ctrl-chan (async/timeout interval)])]
+          (when (not= x :stop)
+            (dorun (map check-connection! (repeat context) (db/get-controllers db)))
+            (recur))))
+      #_(println "D: heartbeat handler stopping"))
+    {:ctrl ctrl-chan}))
 
 ;;(add-handler h/update-subject! :state-changed :trial-data)
 
@@ -176,16 +175,17 @@
      :in zmq-in
      :out zmq-out}))
 
-(defn stop! [context]
-  (async/close! (get-in context [:server :in]))
-  (swap! (:heartbeat context) assoc :running false))
-
 (defn start! [dburi addr]
   (let [context {:database (db/connect! dburi)
                  :server (start-zmq-server addr)}]
     (assoc context
            :heartbeat (start-heartbeat context 2000)
            :msg-handler (start-message-handler context))))
+
+(defn stop! [context]
+  (async/close! (get-in context [:server :in]))
+  (async/put! (get-in context [:heartbeat :ctrl]) :stop))
+
 
 #_(defn -main
   "I don't do a whole lot ... yet."
