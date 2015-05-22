@@ -1,6 +1,5 @@
 (ns decide-host.aggregators
   "Functions that make calculations on aggregate data"
-  (:gen-class)
   (:require [decide-host.database :refer [db trial-coll event-coll]]
             [clojure.core.match :refer [match]]
             [monger.collection :as mc]
