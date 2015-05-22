@@ -1,5 +1,6 @@
 (ns decide-host.database
-  (:require [monger.joda-time]
+  (:require [decide-host.config :refer [config]]
+            [monger.joda-time]
             [monger.core :as mg]
             [monger.collection :as mc]
             [monger.result :refer [ok? updated-existing?]]
@@ -14,7 +15,7 @@
 (def subj-coll "subjects")
 (def ctrl-coll "controllers")
 
-(def db (atom nil))
+(def ^:private init-alive (get (config) :heartbeat-max-ping 10))
 
 (defn object-id
   "Returns a new BSON ObjectID, either newly generated or from a string
@@ -39,78 +40,85 @@
     map))
 
 (defn connect!
-  "Connect to a mongodb database"
+  "Connect to a mongodb database. Returns map with :conn and :db"
   [uri]
   (let [res (mg/connect-via-uri uri)]
     (mg/get-db-names (:conn res))       ; will throw error for bad connection
     (println "I: connected to database at" uri)
-    ;; ensure indices here or in a setup script?
-    (reset! db (:db res))
-    res))
+    (assoc res :uri uri)))
 
 (defn add-controller!
-  [sock-id addr & kv]
-  (mc/update @db ctrl-coll
+  [db sock-id addr]
+  (mc/update db ctrl-coll
              {:zmq-id sock-id}
-             (apply assoc {:addr addr} :zmq-id sock-id kv)
+             {:addr addr :zmq-id sock-id}
              {:upsert true}))
 
 (defn remove-controller!
   "Removes controller from database"
-  [sock-id] (mc/remove @db ctrl-coll {:zmq-id sock-id}))
+  [db sock-id] (mc/remove db ctrl-coll {:zmq-id sock-id}))
 
 (defn update-controller!
   "Updates database entry for controller"
-  [sock-id kv] (mc/update @db ctrl-coll {:zmq-id sock-id} {$set kv} {:multi true}))
+  [db sock-id kv] (mc/update db ctrl-coll {:zmq-id sock-id} {$set kv}))
+
+(defn set-alive!
+  "Sets aliveness for controller entry"
+  [db sock-id] (mc/update db ctrl-coll
+                          {:zmq-id sock-id}
+                          {$set {:alive init-alive :last-seen (t/now)}}))
 
 (defn dec-alive!
   "Decrements aliveness counter for controller"
-  [sock-id] (mc/update @db ctrl-coll {:zmq-id sock-id} {$inc {:alive -1}}))
+  [db sock-id] (mc/update db ctrl-coll {:zmq-id sock-id} {$inc {:alive -1}}))
 
-(defn get-controller-by-socket [sock-id] (mc/find-one-as-map @db ctrl-coll {:zmq-id sock-id}))
-(defn get-controller-by-addr [addr] (mc/find-one-as-map @db ctrl-coll {:addr addr}))
-(defn get-living-controllers [] (mc/find-maps @db ctrl-coll {:alive {$gt 0}}))
-(defn get-controllers [] (mc/find-maps @db ctrl-coll))
+(defn get-controller-by-socket
+  [db sock-id]
+  (mc/find-one-as-map db ctrl-coll {:zmq-id sock-id}))
+(defn get-controller-by-addr [db addr] (mc/find-one-as-map db ctrl-coll {:addr addr}))
+
+(defn get-living-controllers [db] (mc/find-maps db ctrl-coll {:alive {$gt 0}}))
+(defn get-controllers [db] (mc/find-maps db ctrl-coll))
 
 (defn start-subject!
   "Updates database when subject starts running an experiment"
-  [subject data]
-  (mc/update @db subj-coll {:_id (uuid subject)} {$set data} {:upsert true}))
+  [db subject data]
+  (mc/update db subj-coll {:_id (uuid subject)} {$set data} {:upsert true}))
 
 (defn stop-subject!
   "Updates database when subject stops running an experiment"
-  ([addr] (stop-subject! addr (t/now)))
-  ([addr time] (mc/update @db subj-coll
+  ([db addr] (stop-subject! db addr (t/now)))
+  ([db addr time] (mc/update db subj-coll
                           {:controller addr}
                           {$set {:controller nil :procedure nil :stop-time time} })))
 
 (defn update-subject!
   "Updates subject record in database"
-  [subject data]
-  (mc/update-by-id @db subj-coll (uuid subject) {$set data}))
+  [db subject data]
+  (mc/update-by-id db subj-coll (uuid subject) {$set data}))
 
 (defn update-subject-by-controller!
-  [addr data]
-  (mc/update @db subj-coll {:controller addr} {$set data}))
+  [db addr data]
+  (mc/update db subj-coll {:controller addr} {$set data}))
 
-(defn get-subject [subject] (when subject (mc/find-map-by-id @db subj-coll (uuid subject))))
-(defn get-subject-by-addr [addr] (mc/find-one-as-map @db subj-coll {:controller addr}))
+(defn get-subject [db subject] (when subject (mc/find-map-by-id db subj-coll (uuid subject))))
+(defn get-subject-by-addr [db addr] (mc/find-one-as-map db subj-coll {:controller addr}))
 (defn get-procedure
   "Gets currently running experiment for subject iff the associated controller is alive"
-  [subject]
-  (let [{:keys [controller procedure]} (get-subject subject)
-        ctrl (mc/find-one-as-map @db ctrl-coll {:addr controller :alive {$gt 0}})]
+  [db subject]
+  (let [{:keys [controller procedure]} (get-subject db subject)
+        ctrl (mc/find-one-as-map db ctrl-coll {:addr controller :alive {$gt 0}})]
     (when ctrl procedure)))
 
-(defn log-message! [data-type data-id data]
-  (try
-    (let [coll (case data-type
+(defn log-message! [db data-type data-id data]
+  (if-let [coll (case data-type
                     "state-changed" event-coll
-                    "trial-data" trial-coll)
-          obj-id (object-id data-id)]
-      (if (updated-existing? (mc/update @db coll
-                                        {:_id obj-id}
-                                        (convert-subject-uuid data)
-                                        {:upsert true}))
-        :dup :ack))
-    (catch IllegalArgumentException e :rtfm-dtype)))
+                    "trial-data" trial-coll
+                    nil)]
+      (let [obj-id (object-id data-id)]
+        (if (updated-existing? (mc/update db coll
+                                          {:_id obj-id}
+                                          (convert-subject-uuid data)
+                                          {:upsert true}))
+          :dup :ack))
+      :rtfm-dtype))

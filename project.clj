@@ -27,6 +27,7 @@
 
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}
-             :dev {:dependencies [[midje "1.5.1"]
+             :dev {:source-paths ["dev"]
+                   :dependencies [[midje "1.5.1"]
                                   [javax.servlet/servlet-api "2.5"]
                                   [ring-mock "0.1.5"]]}})

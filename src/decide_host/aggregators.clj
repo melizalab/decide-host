@@ -1,7 +1,6 @@
 (ns decide-host.aggregators
   "Functions that make calculations on aggregate data"
-  (:require [decide-host.database :refer [db trial-coll event-coll]]
-            [clojure.core.match :refer [match]]
+  (:require [decide-host.database :refer [trial-coll event-coll]]
             [monger.collection :as mc]
             [monger.operators :refer :all]
             [clj-time.core :as t]
@@ -16,10 +15,10 @@
   "Returns a sequence of maps giving the number of trials run today by each
   subject in the database. The query can be restricted by providing additional
   query keywords (e.g., :subject subj-id)"
-  [& restrict]
+  [db & restrict]
   (let [midnight (today-local-midnight)
         query (apply assoc {$gte {:time midnight}} :comment nil restrict)]
-    (mc/aggregate @db trial-coll [{$match query}
+    (mc/aggregate db trial-coll [{$match query}
                                   {$group { :_id "$subject" :trials {$sum 1}}}]))  )
 
 ;; it might be more useful to calculate the total amount of time the hopper has
@@ -28,21 +27,21 @@
   "Returns a sequence of maps giving the number of trials run today by each
   subject in the database. The query can be restricted by providing additional
   query keywords (e.g., :subject subj-id)"
-  [& restrict]
+  [db & restrict]
   (let [midnight (today-local-midnight)
         query (apply assoc {$gte {:time midnight}} :result "feed" restrict)]
-    (mc/aggregate @db trial-coll [{$match query}
+    (mc/aggregate db trial-coll [{$match query}
                                   {$group { :_id "$subject" :feed-ops {$sum 1}}}])))
 
 (defn recent-accuracy
   "Returns a sequence of maps giving the number of correct responses given in
   the last interval ms by each subject in the database. The query can be
   restricted by providing additional query keywords (e.g., :subject subj-id)"
-  [interval & restrict]
+  [db interval & restrict]
   (let [mark (t/minus (t/now) (t/millis interval))
         query (apply assoc {$gte {:time mark}} :comment nil restrict)]
     ;; have to convert booleans to numerical values
-    (mc/aggregate @db/db "trials"
+    (mc/aggregate db "trials"
                   [{$match {:comment nil}}
                    {$project {:subject 1 :correct {$cond ["$correct" 1 0]}}}
                    {$group { :_id "$subject" :trials {$sum 1} :correct {$sum "$correct"}}}])))

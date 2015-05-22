@@ -1,6 +1,6 @@
 (ns decide-host.client-test
   (:require [midje.sweet :refer :all]
-            [decide-host.core :refer [start-zmq-server to-string protocol]]
+            [decide-host.host :as host :refer [to-string get-config]]
             [decide-host.database :refer [connect!]]
             [com.keminglabs.zmq-async.core :refer [register-socket!]]
             [clojure.core.async :as async :refer [>! <! >!! <!!]]
@@ -21,10 +21,13 @@
     {:in zmq-in
      :out zmq-out}))
 
-(defn start-server [addr]
-  (let [{:keys [conn db]} (connect! test-uri)]
-    (mg/drop-db conn test-db)
-    (start-zmq-server addr)))
+(defn start-host [addr]
+  (let [context {:database (connect! test-uri)
+                 :server (host/start-zmq-server addr)}]
+    (mg/drop-db (get-in context [:database :conn]) test-db)
+    (assoc context
+           :heartbeat (host/start-heartbeat context 2000)
+           :msg-handler (host/start-message-handler context))))
 
 (defn parse-message [rep]
   (if (seq? rep)
@@ -51,21 +54,21 @@
     hugz))
 
 ;; most of the request-reply logic is tested in core-test and is not duplicated
-;; here. Mostly we want to check that heartbeating works as expected
-
-#_(fact-group :integration "client-server integration"
-  (let [{:keys [in out]} (connect-client server-address)
-        srv-in (start-server server-address)
-        hugz (hugger in out)]
+;; here. Mostly we want to check that heartbeating works as expected.
+#_(let [context (start-host server-address)]
+  (fact-group :integration "client-server integration"
+    (let [{:keys [in out]} (connect-client server-address)
+          hugz (hugger in out)]
     (fact "client connects to server"
-        (req in out "OHAI" protocol "test") => "OHAI-OK")
+      (req in out "OHAI" (get-config :protocol) "test") => "OHAI-OK")
     (fact "client receives heartbeats"
       (<!! (async/timeout 4000))    ; wait for a few messages to accumulate
       @hugz =not=> 0)
     (fact "server survives client timeout"
-        (reset! hugz -2)              ; shuts down the loop
-        (<!! (async/timeout 25000)))
+      (reset! hugz -2)              ; shuts down the loop
+      (<!! (async/timeout 25000)))
     (fact "server doesn't acknowledge disconnect"
         (req in out "KTHXBAI") => nil)
-    (async/close! srv-in)
+
     (async/close! in)))
+  (host/stop-zmq-server (:server context)))

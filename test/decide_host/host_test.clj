@@ -1,6 +1,6 @@
-(ns decide-host.core-test
+(ns decide-host.host-test
   (:require [midje.sweet :refer :all]
-            [decide-host.core :refer :all]
+            [decide-host.host :refer :all]
             [decide-host.database :as db]
             [monger.core :as mg]
             [monger.collection :as mc]
@@ -20,7 +20,10 @@
                     :subject "bef9a524-10cf-4cb2-8f6d-d1eeed3d3725"
                     :time 1431981358138587})
 
-(defn count-controllers [] (count (db/get-living-controllers)))
+(defn count-controllers [context]
+  (count (db/get-living-controllers (get-in context [:database :db]))))
+(defn reset-database [context]
+  (mg/drop-db (get-in context [:database :conn]) test-db))
 
 (fact "to-string handles byte arrays and nils"
     (to-string nil) => nil
@@ -36,63 +39,65 @@
     (decode-pub "garbage") => nil
     (decode-pub "{\"a\":1}") => {:a 1})
 
-(let [{:keys [conn db]} (db/connect! test-uri)
+(let [ctx {:database (db/connect! test-uri)}
+      {{db :db} :database} ctx
       subject "acde" sock-id "test-ctrl" addr "test" procedure "testing"
       data-id "data-id"
       event-msg (json/encode example-event)
       trial-msg (json/encode example-trial)]
-  (mg/drop-db conn test-db)
-  (with-state-changes [(after :facts (mg/drop-db conn test-db))]
+  (reset-database ctx)
+  (with-state-changes [(after :facts (reset-database ctx))]
     (fact "only one connection per controller"
-        (connect! sock-id addr) => :ok
-        (connect! "another-socket" addr) => :wtf
+        (connect! ctx sock-id addr) => :ok
+        (connect! ctx "another-socket" addr) => :wtf
         ;; we don't need to worry about a socket identity connecting from
         ;; another host because zeromq will not allow multiple connections to
         ;; share the same socket id. What it probably means is that the client
         ;; screwed up. However, duplicates have to be dropped or the state
         ;; will get fubared.
-        (connect! sock-id "another-address") => :ok
-        (count-controllers) => 1)
+        (connect! ctx sock-id "another-address") => :ok
+        (count-controllers ctx) => 1)
     (fact "controllers can send duplicate connection messages"
-        (connect! sock-id addr) => :ok
-        (connect! sock-id addr) => :ok
-        (count-controllers) => 1)
+        (connect! ctx sock-id addr) => :ok
+        (connect! ctx sock-id addr) => :ok
+        (count-controllers ctx) => 1)
     (fact "controllers can disconnect and reconnect"
-        (connect! sock-id addr) => :ok
-        (count-controllers) => 1
-        (disconnect! sock-id)
-        (count-controllers) => 0
-        (connect! sock-id addr) => :ok))
+        (connect! ctx sock-id addr) => :ok
+        (count-controllers ctx) => 1
+        (disconnect! ctx sock-id)
+        (count-controllers ctx) => 0
+        (connect! ctx sock-id addr) => :ok))
   (fact "processing incoming messages"
     (fact "unrecognized messages rejected"
-        (process-message! sock-id "WHODAT") => (just ["RTFM" anything]))
+        (process-message! ctx sock-id "WHODAT") => (just ["RTFM" anything]))
     (fact "unpeered PUB messages rejected"
-        (process-message! sock-id "PUB" "state-changed" data-id
+        (process-message! ctx sock-id "PUB" "state-changed" data-id
                           event-msg) => (just ["WHO?"]))
     (fact "open-peering"
         (fact "rejects wrong protocol"
-            (process-message! sock-id "OHAI" "garble") => (just ["RTFM" anything]))
+            (process-message! ctx sock-id "OHAI" "garble") => (just ["RTFM" anything]))
       (fact "accepts correct handshake"
-          (process-message! sock-id "OHAI" protocol addr) => ["OHAI-OK"]
-          (count-controllers) => 1)
+          (process-message! ctx sock-id "OHAI" (get-config :protocol) addr) => ["OHAI-OK"]
+          (count-controllers ctx) => 1)
       (fact "does not accept connections from other sockets when controller is alive"
-          (process-message! "other-id" "OHAI" protocol addr) => (just ["WTF" anything])))
+          (process-message! ctx "other-id" "OHAI" (get-config :protocol) addr) => (just ["WTF" anything])))
     (fact "use-peering"
         (fact "responds to heartbeats"
-            (process-message! sock-id "HUGZ") => ["HUGZ-OK"])
+            (process-message! ctx sock-id "HUGZ") => ["HUGZ-OK"])
       (fact "accepts event data"
-          (process-message! sock-id "PUB" "state-changed" data-id
+          (process-message! ctx sock-id "PUB" "state-changed" data-id
                             event-msg) => (just ["ACK" data-id])
           (mc/count db db/event-coll {:_id data-id}) => 1)
       (fact "drops duplicate data"
-          (process-message! sock-id "PUB" "state-changed" data-id
+          (process-message! ctx sock-id "PUB" "state-changed" data-id
                             event-msg) => (just ["DUP" data-id])
           (mc/count db db/event-coll {:_id data-id}) => 1)
       (fact "accepts trial data"
-          (process-message! sock-id "PUB" "trial-data" data-id
+          (process-message! ctx sock-id "PUB" "trial-data" data-id
                             trial-msg) => (just ["ACK" data-id])
           (mc/count db db/trial-coll {:_id data-id}) => 1))
     (fact "close-peering"
         (fact "goodbye unregisters controller"
-            (process-message! sock-id "KTHXBAI")
-            (count-controllers) => 0))))
+            (process-message! ctx sock-id "KTHXBAI")
+          (count-controllers ctx) => 0)))
+  )

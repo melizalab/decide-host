@@ -22,17 +22,18 @@
               :subject subject}]
     (facts "about update-subject"
        (fact "handles experiment state-changed updates"
-          (db/add-controller! sock-id addr)
-         (db/update-controller! sock-id {:alive 10})
-         (db/get-procedure subject) => nil
-         (update-subject! data)
-         (db/get-procedure subject) => procedure)
+          (db/add-controller! db sock-id addr)
+         (db/update-controller! db sock-id {:alive 10})
+         (db/get-procedure db subject) => nil
+         (update-subject! db data)
+         (db/get-procedure db subject) => procedure)
        (fact "updates last-fed for hopper events"
-         (update-subject! {:topic :state-changed :name "hopper" :up 1 :addr addr :time 1234})
-         (db/get-subject subject) => (contains {:last-fed 1234}))
+         (update-subject! db {:topic :state-changed :name "hopper" :up 1
+                                :addr addr :time 1234})
+         (db/get-subject db subject) => (contains {:last-fed 1234}))
        (fact "updates last-trial for trial events"
-         (update-subject! {:topic :trial-data :subject subject :trial 10 :time 4567})
-         (db/get-subject subject) => (contains {:last-trial 4567}))
+         (update-subject! db {:topic :trial-data :subject subject :trial 10 :time 4567})
+         (db/get-subject db subject) => (contains {:last-trial 4567}))
        (fact "update-subject updates current experiment"
-         (update-subject! {:topic :trial-data :subject subject :experiment "blah"})
-         (db/get-subject subject) => (contains {:experiment "blah"})))))
+         (update-subject! db {:topic :trial-data :subject subject :experiment "blah"})
+         (db/get-subject db subject) => (contains {:experiment "blah"})))))

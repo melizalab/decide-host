@@ -33,46 +33,46 @@
   (with-state-changes [(after :facts (mg/drop-db conn test-db))]
     (fact "about controller state management"
         (fact "bad values return nil"
-              (get-controller-by-addr nil) => nil
-              (get-controller-by-socket nil) => nil
-              (get-controller-by-addr addr) => nil
-              (get-controller-by-socket sock-id) => nil)
-        (add-controller! sock-id addr)
-        (get-controller-by-addr addr) => (contains {:zmq-id sock-id :addr addr})
-        (get-controller-by-socket sock-id) => (contains {:zmq-id sock-id :addr addr})
-        (update-controller! sock-id {:alive INIT-ALIVE})
-        (count (get-living-controllers)) => 1
-        (update-controller! sock-id {:alive 0})
-        (count (get-living-controllers)) => 0
+              (get-controller-by-addr db nil) => nil
+              (get-controller-by-socket db nil) => nil
+              (get-controller-by-addr db addr) => nil
+              (get-controller-by-socket db sock-id) => nil)
+        (add-controller! db sock-id addr)
+        (get-controller-by-addr db addr) => (contains {:zmq-id sock-id :addr addr})
+        (get-controller-by-socket db sock-id) => (contains {:zmq-id sock-id :addr addr})
+        (update-controller! db sock-id {:alive INIT-ALIVE})
+        (count (get-living-controllers db)) => 1
+        (update-controller! db sock-id {:alive 0})
+        (count (get-living-controllers db)) => 0
         )
     (fact "about subject state management"
         (fact "bad values return nil"
-              (get-subject nil) => nil
-              (get-subject subject) => nil)
+              (get-subject db nil) => nil
+              (get-subject db subject) => nil)
         (let [data {:controller addr :procedure "testing"}]
-          (start-subject! subject data)
+          (start-subject! db subject data)
           ;; TODO fix time equality checks
-          (get-subject subject) => (contains data)
-          (get-subject-by-addr (:controller data)) => (contains data)
-          (stop-subject! addr)
-          (get-subject subject) => (contains {:controller nil :procedure nil})))
+          (get-subject db subject) => (contains data)
+          (get-subject-by-addr db (:controller data)) => (contains data)
+          (stop-subject! db addr)
+          (get-subject db subject) => (contains {:controller nil :procedure nil})))
     (fact "about logging messages"
         (let [oid (.toString (object-id))
               message {:subject "acde" :time 12345}]
-          (log-message! "not-a-valid-message-type" oid message) => :rtfm-dtype
-          (log-message! "state-changed" oid message) => :ack
-          (log-message! "state-changed" oid message) => :dup
-          (log-message! "trial-data" oid message) => :ack
-          (log-message! "trial-data" oid message) => :dup
+          (log-message! db "not-a-valid-message-type" oid message) => :rtfm-dtype
+          (log-message! db "state-changed" oid message) => :ack
+          (log-message! db "state-changed" oid message) => :dup
+          (log-message! db "trial-data" oid message) => :ack
+          (log-message! db "trial-data" oid message) => :dup
           (mc/count db trial-coll {:subject "acde"}) => 1
           (mc/count db event-coll {:subject "acde"}) => 1))
     (fact "about integrated subject/controller state"
         (let [data {:controller addr :procedure "testing"}]
-          (add-controller! sock-id addr)
-          (update-controller! sock-id {:alive INIT-ALIVE})
-          (start-subject! subject data)
-          (get-procedure subject) => (:procedure data)
-          (get-procedure "some-other-subject") => nil
-          (update-controller! sock-id {:alive 0})
-          (get-procedure subject) => nil
-          ))))
+          (add-controller! db sock-id addr)
+          (update-controller! db sock-id {:alive INIT-ALIVE})
+          (start-subject! db subject data)
+          (get-procedure db subject) => (:procedure data)
+          (get-procedure db "some-other-subject") => nil
+          (update-controller! db sock-id {:alive 0})
+          (get-procedure db subject) => nil))
+    ))
