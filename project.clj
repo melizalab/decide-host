@@ -22,9 +22,9 @@
                  [cheshire "5.4.0"]
                  [clj-time "0.8.0"]]
 
-  ;;:plugins [[jarohen/lein-frodo "0.4.1"]]
+  :plugins [[jarohen/lein-frodo "0.4.1"]]
+  :frodo/config-resource "config/nomad-config.edn"
 
-  :main ^:skip-aot decide-host.web
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}
              :dev {:dependencies [[midje "1.5.1"]

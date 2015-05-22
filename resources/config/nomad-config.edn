@@ -1,0 +1,5 @@
+{:nomad/hosts
+ {"pica"
+  {:frodo/config {:nrepl {:port 7888}
+                  :web {:port 8080
+                        :app decide-host.web/app}}}}}
