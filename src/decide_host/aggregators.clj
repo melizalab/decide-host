@@ -9,7 +9,20 @@
 (defn today-local-midnight
   "Returns the time at the start of the day in local time"
   []
-  (tc/to-long (t/from-time-zone (t/today-at 0 0) (t/default-time-zone))))
+  (t/from-time-zone (t/today-at 0 0) (t/default-time-zone)))
+
+(defn merge-query
+  "keyval => key val"
+  [base keyvals]
+  (let [kv (apply hash-map keyvals)]
+    (merge-with merge base kv)))
+
+(defn rekey-result
+  [key map]
+  (let [newkey (key map)]
+    (if-let [result (:result map)]
+      {newkey result}
+      {newkey (dissoc map key)})))
 
 (defn trials-today
   "Returns a sequence of maps giving the number of trials run today by each
@@ -17,9 +30,9 @@
   query keywords (e.g., :subject subj-id)"
   [db & restrict]
   (let [midnight (today-local-midnight)
-        query (apply assoc {$gte {:time midnight}} :comment nil restrict)]
+        query (merge-query {:time {$gte midnight} :comment nil} restrict)]
     (mc/aggregate db trial-coll [{$match query}
-                                  {$group { :_id "$subject" :trials {$sum 1}}}]))  )
+                                 {$group { :_id "$subject" :result {$sum 1}}}]))  )
 
 ;; it might be more useful to calculate the total amount of time the hopper has
 ;; been up, but that's fairly difficult to do
@@ -29,19 +42,36 @@
   query keywords (e.g., :subject subj-id)"
   [db & restrict]
   (let [midnight (today-local-midnight)
-        query (apply assoc {$gte {:time midnight}} :result "feed" restrict)]
+        query (merge-query {:time {$gte midnight} :result "feed"} restrict)]
     (mc/aggregate db trial-coll [{$match query}
-                                  {$group { :_id "$subject" :feed-ops {$sum 1}}}])))
+                                  {$group { :_id "$subject" :result {$sum 1}}}])))
 
 (defn recent-accuracy
   "Returns a sequence of maps giving the number of correct responses given in
-  the last interval ms by each subject in the database. The query can be
+  the last interval by each subject in the database. The query can be
   restricted by providing additional query keywords (e.g., :subject subj-id)"
-  [db interval & restrict]
-  (let [mark (t/minus (t/now) (t/millis interval))
-        query (apply assoc {$gte {:time mark}} :comment nil restrict)]
+  [db & restrict]
+  ;; TODO accept :interval as keyword
+  (let [interval (t/hours 1)
+        mark (t/minus (t/now) interval)
+        query (merge-query {:time {$gte mark} :comment nil} restrict)]
     ;; have to convert booleans to numerical values
-    (mc/aggregate db "trials"
-                  [{$match {:comment nil}}
-                   {$project {:subject 1 :correct {$cond ["$correct" 1 0]}}}
-                   {$group { :_id "$subject" :trials {$sum 1} :correct {$sum "$correct"}}}])))
+    (println "D: query" query)
+    (mc/aggregate db trial-coll
+                  [{$match query}
+                   {$project {:subject 1 :correct {$cond ["$correct" 1 0]}
+                              :since {"$literal" mark}}}
+                   {$group {:_id "$subject" :since {$first "$since"}
+                            :trials {$sum 1} :correct {$sum "$correct"}}}])))
+
+(defn all-stats
+  [db & restrict]
+
+  )
+
+#_(defn subjects
+  [db & restrict]
+  (let [subjects (mc/find db trial-coll (hash-map restrict))
+        agg-fun (juxt trials-today feed-ops-today recent-accuracy)
+        aggregates (apply agg-fun db restrict)]
+    (join-on :_id subjects)))
