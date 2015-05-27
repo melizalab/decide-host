@@ -3,3 +3,6 @@
             [nomad :refer [defconfig]]))
 
 (defconfig config (io/resource "config/nomad-config.edn"))
+
+(defn init-context []
+  (select-keys (config) [:database :host :email]))

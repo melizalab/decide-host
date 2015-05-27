@@ -108,8 +108,20 @@
            ;; error message
            :else ["RTFM" (str "unrecognized command '" ps "'")])))
 
+(defn check-connection!
+  [context controller]
+  (let [{{db :db} :database {zin :in heartbeat :heartbeat-ms} :host} context
+        {:keys [addr alive last-seen zmq-id]} controller
+        interval (t/in-millis (t/interval last-seen (t/now)))]
+    #_(println "D:" addr "last seen" interval "ms ago")
+    (cond
+      (not (pos? alive)) (disconnect! context zmq-id :err)
+      (> interval heartbeat)
+      (do
+        (db/dec-alive! db zmq-id)
+        (async/put! zin [(hex-to-bytes zmq-id) "HUGZ"])))))
 
-(defn start-message-handler
+(defn- start-message-handler
   [context]
   (let [{{zin :in zout :out} :host} context
         events (async/chan (async/sliding-buffer 64))
@@ -126,20 +138,7 @@
     {:event-chan events                 ; only used for testing
      :event-pub (async/pub events :topic)}))
 
-(defn check-connection!
-  [context controller]
-  (let [{{db :db} :database {zin :in heartbeat :heartbeat-ms} :host} context
-        {:keys [addr alive last-seen zmq-id]} controller
-        interval (t/in-millis (t/interval last-seen (t/now)))]
-    #_(println "D:" addr "last seen" interval "ms ago")
-    (cond
-      (not (pos? alive)) (disconnect! context zmq-id :err)
-      (> interval heartbeat)
-      (do
-        (db/dec-alive! db zmq-id)
-        (async/put! zin [(hex-to-bytes zmq-id) "HUGZ"])))))
-
-(defn start-heartbeat
+(defn- start-heartbeat
   [context interval]
   (let [{{zin :in} :host {db :db} :database} context
         ctrl-chan (async/chan)]
@@ -154,7 +153,7 @@
 
 ;;(add-handler h/update-subject! :state-changed :trial-data)
 
-(defn start-zmq-server
+(defn- start-zmq-server
   "Starts a server that will bind a zeromq socket to addr."
   [context]
   (let [{{addr :addr} :host} context

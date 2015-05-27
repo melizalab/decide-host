@@ -4,12 +4,22 @@
             [decide-host.core :refer [object-id]]
             [monger.core :as mg]
             [monger.collection :as mc]
+            [monger.operators :refer :all]
             [monger.result :refer [ok? updated-existing?]]
-            [clj-time.core :as t]))
+            [clj-time.core :as t]
+            [clj-time.coerce :as tc]))
 
 (def test-db "decide-test")
 (def test-uri (str "mongodb://localhost/" test-db))
 (def INIT-ALIVE 5)
+
+(fact "about parse-time-constraint"
+    (parse-time-constraint {:a 1} :after) => {:a 1}
+    (parse-time-constraint {:a 1 :after "blarg"} :after) => {:a 1 :after "blarg"}
+    (let [tt 1432753029026
+          tp (tc/from-long tt)]
+      (parse-time-constraint {:a 1 :after (str tt)} :after) => {:a 1 :time {$gte tp}}
+      (parse-time-constraint {:a 1 :before (str tt)} :before) => {:a 1 :time {$lte tp}}))
 
 (fact "bad uris generate exceptions"
     (connect! "garbledegook") => (throws Exception)
@@ -62,5 +72,4 @@
           (get-procedure db subject) => (:procedure data)
           (get-procedure db "some-other-subject") => nil
           (update-controller! db sock-id {:alive 0})
-          (get-procedure db subject) => nil))
-    ))
+          (get-procedure db subject) => nil))))

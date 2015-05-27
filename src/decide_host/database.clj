@@ -5,7 +5,8 @@
             [monger.collection :as mc]
             [monger.result :refer [ok? updated-existing?]]
             [monger.operators :refer :all]
-            [clj-time.core :as t]))
+            [clj-time.core :as t]
+            [clj-time.coerce :as tc]))
 
 ;; collection names
 (def event-coll "events")
@@ -14,6 +15,18 @@
 (def ctrl-coll "controllers")
 
 (def ^:private init-alive 10)
+
+(def ^:private time-keyops {:before $lte
+                            :after $gte})
+
+(defn parse-time-constraint
+  "Parses parameter to appropriate mongodb query operator."
+  [params key]
+  (let [op (key time-keyops)
+        time (key params)]
+    (try
+      (merge-in (dissoc params key) {:time {op (tc/from-long (Long. time))}})
+      (catch NumberFormatException e params))))
 
 (defn connect!
   "Connect to a mongodb database. Returns map with :conn and :db"
@@ -86,8 +99,10 @@
         ctrl (mc/find-one-as-map db ctrl-coll {:addr controller :alive {$gt 0}})]
     (when ctrl procedure)))
 
-(defn get-trials
-  [db subject])
+(defn find-trials
+  [db query]
+  (let [query (convert-subject-uuid query)]
+    (mc/find-maps db trial-coll query {:_id 0})))
 
 (defn log-message! [db data-type data-id data]
   (if-let [coll (case data-type
