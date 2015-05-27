@@ -1,13 +1,11 @@
 (ns decide-host.database
-  (:require [decide-host.config :refer [config]]
+  (:require [decide-host.core :refer :all]
             [monger.joda-time]
             [monger.core :as mg]
             [monger.collection :as mc]
             [monger.result :refer [ok? updated-existing?]]
             [monger.operators :refer :all]
-            [clj-time.core :as t])
-  (:import [org.bson.types ObjectId]
-           [java.util UUID]))
+            [clj-time.core :as t]))
 
 ;; collection names
 (def event-coll "events")
@@ -15,29 +13,7 @@
 (def subj-coll "subjects")
 (def ctrl-coll "controllers")
 
-(def ^:private init-alive (get (config) :heartbeat-max-ping 10))
-
-(defn object-id
-  "Returns a new BSON ObjectID, either newly generated or from a string
-  argument. If the string can't be converted to an ObjectID, it's returned
-  as-is."
-  ([] (ObjectId.))
-  ([x] (try (ObjectId. x)
-            (catch IllegalArgumentException e x))))
-
-(defn uuid
-  "Converts s to UUID type if possible. Otherwise returns the original argument"
-  [s]
-  (try (UUID/fromString s)
-       (catch IllegalArgumentException e s)
-       (catch NullPointerException e s)))
-
-(defn convert-subject-uuid
-  "Attempts to convert :subject field if present to a uuid"
-  [map]
-  (if-let [subj (uuid (:subject map))]
-    (assoc map :subject subj)
-    map))
+(def ^:private init-alive 10)
 
 (defn connect!
   "Connect to a mongodb database. Returns map with :conn and :db"
@@ -109,6 +85,9 @@
   (let [{:keys [controller procedure]} (get-subject db subject)
         ctrl (mc/find-one-as-map db ctrl-coll {:addr controller :alive {$gt 0}})]
     (when ctrl procedure)))
+
+(defn get-trials
+  [db subject])
 
 (defn log-message! [db data-type data-id data]
   (if-let [coll (case data-type

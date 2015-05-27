@@ -137,11 +137,6 @@
     (mc/insert-batch db trial-coll trial-data)
     db))
 
-(fact "about merge-query"
-    (merge-query {:a 1} []) => {:a 1}
-    (merge-query {:a 1} [:b 2]) => {:a 1 :b 2}
-    (merge-query {:a {:b 1}} [:a {:c 2}]) => {:a {:b 1 :c 2}})
-
 (fact "about rekey-result"
     (rekey-result :_id {:_id my-uuid :result "blah"}) => {my-uuid "blah"}
     (rekey-result :_id {:_id my-uuid :a 1 :b 2}) => {my-uuid {:a 1 :b 2}})

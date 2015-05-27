@@ -25,15 +25,6 @@
 (defn reset-database [context]
   (mg/drop-db (get-in context [:database :conn]) test-db))
 
-(fact "to-string handles byte arrays and nils"
-    (to-string nil) => nil
-    (to-string "a-string") => "a-string"
-    (to-string (.getBytes "a-string")) => "a-string")
-
-(fact "to-hex converts to and from hex representations of a byte array"
-    (let [x "abracadabra"]
-      (to-string (hex-to-bytes (bytes-to-hex (.getBytes x)))) => x))
-
 (fact "decode-pub correctly handles correct and incorrect JSON"
     (decode-pub nil) => nil
     (decode-pub "garbage") => nil
@@ -99,5 +90,4 @@
     (fact "close-peering"
         (fact "goodbye unregisters controller"
             (process-message! ctx sock-id "KTHXBAI")
-          (count-controllers ctx) => 0)))
-  )
+          (count-controllers ctx) => 0))))

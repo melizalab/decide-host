@@ -1,6 +1,7 @@
 (ns decide-host.database-test
   (:require [midje.sweet :refer :all]
             [decide-host.database :refer :all]
+            [decide-host.core :refer [object-id]]
             [monger.core :as mg]
             [monger.collection :as mc]
             [monger.result :refer [ok? updated-existing?]]
@@ -9,19 +10,6 @@
 (def test-db "decide-test")
 (def test-uri (str "mongodb://localhost/" test-db))
 (def INIT-ALIVE 5)
-
-(fact "object-id fails gracefully"
-    (object-id "garble") => "garble")
-
-(fact "uuid fails gracefully"
-    (uuid "garble") => "garble")
-
-(fact "convert-subject-uuid only replaces subject uuid if present"
-    (let [uuid-str "b1367245-a528-4e65-82f6-5363f87166ac"
-          uuid-obj (uuid uuid-str)]
-      (convert-subject-uuid {:unrelated "data"}) => (just {:unrelated "data"})
-      (convert-subject-uuid {:subject "not-a-uuid"}) => (just {:subject "not-a-uuid"})
-      (convert-subject-uuid {:subject uuid-str}) => {:subject uuid-obj}))
 
 (fact "bad uris generate exceptions"
     (connect! "garbledegook") => (throws Exception)

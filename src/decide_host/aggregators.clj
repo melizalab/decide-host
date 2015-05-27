@@ -1,6 +1,7 @@
 (ns decide-host.aggregators
   "Functions that make calculations on aggregate data"
-  (:require [decide-host.database :refer [trial-coll event-coll]]
+  (:require [decide-host.core :refer [merge-in]]
+            [decide-host.database :refer [trial-coll event-coll]]
             [monger.collection :as mc]
             [monger.operators :refer :all]
             [clj-time.core :as t]
@@ -11,11 +12,8 @@
   []
   (t/from-time-zone (t/today-at 0 0) (t/default-time-zone)))
 
-(defn merge-query
-  "keyval => key val"
-  [base keyvals]
-  (let [kv (apply hash-map keyvals)]
-    (merge-with merge base kv)))
+(defn merge-query [base restrict]
+  (merge-in base (apply hash-map restrict)))
 
 (defn rekey-result
   [key map]

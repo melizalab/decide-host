@@ -1,6 +1,6 @@
 (ns decide-host.host
   "Functions for processing messages from controllers to host"
-  (:require [decide-host.config :refer [config]]
+  (:require [decide-host.core :refer :all]
             [decide-host.database :as db]
             [com.keminglabs.zmq-async.core :refer [register-socket!]]
             [clojure.core.async :as async :refer [>! <! >!! <!!]]
@@ -8,13 +8,6 @@
             [clj-time.core :as t]
             [clj-time.coerce :as tc]
             [cheshire.core :as json]))
-
-(defn get-config [& ks] (get-in (config) (cons :host ks)))
-(def version (-> "project.clj" slurp read-string (nth 2)))
-
-(defn to-string [x] (when-not (nil? x) (String. x)))
-(defn bytes-to-hex [x] (when-not (nil? x) (apply str (map #(format "%02x" %) x))))
-(defn hex-to-bytes [x] (.toByteArray (BigInteger. x 16)))
 
 ;; channel and publication used to distribute non-core processing of events
 ;; note that events may get dropped on this channel
@@ -83,13 +76,12 @@
 (defn process-message!
   "Processes decide-host messages from clients. Returns the reply message."
   [context id & data]
-  (let [{{db :db} :database} context
-        [ps s1 s2 s3] (map to-string data)
-        right-protocol (get-config :protocol)]
+  (let [{{db :db} :database {protocol :protocol} :host} context
+        [ps s1 s2 s3] (map to-string data)]
     #_(println "D: received" id ps s1 s2 s3)
     (match [ps s1 s2 s3]
            ;; open-peering
-           ["OHAI" right-protocol (addr :guard (complement nil?)) _]
+           ["OHAI" protocol (addr :guard (complement nil?)) _]
            (case (connect! context id addr)
              :ok ["OHAI-OK"]
              :wtf ["WTF" (str addr " is already connected")])
@@ -119,7 +111,7 @@
 
 (defn start-message-handler
   [context]
-  (let [{{zin :in zout :out} :server} context
+  (let [{{zin :in zout :out} :host} context
         events (async/chan (async/sliding-buffer 64))
         ctx (assoc context :event-chan events)]
     (async/thread
@@ -136,21 +128,20 @@
 
 (defn check-connection!
   [context controller]
-  (let [{{db :db} :database {zin :in} :server} context
+  (let [{{db :db} :database {zin :in heartbeat :heartbeat-ms} :host} context
         {:keys [addr alive last-seen zmq-id]} controller
-        heartbeat-ms (get-config :heartbeat-ms)
         interval (t/in-millis (t/interval last-seen (t/now)))]
     #_(println "D:" addr "last seen" interval "ms ago")
     (cond
       (not (pos? alive)) (disconnect! context zmq-id :err)
-      (> interval heartbeat-ms)
+      (> interval heartbeat)
       (do
         (db/dec-alive! db zmq-id)
         (async/put! zin [(hex-to-bytes zmq-id) "HUGZ"])))))
 
 (defn start-heartbeat
   [context interval]
-  (let [{{zin :in} :server {db :db} :database} context
+  (let [{{zin :in} :host {db :db} :database} context
         ctrl-chan (async/chan)]
     (async/go
       (loop []
@@ -165,23 +156,23 @@
 
 (defn start-zmq-server
   "Starts a server that will bind a zeromq socket to addr."
-  [addr]
-  (let [zmq-in (async/chan (async/sliding-buffer 64))
+  [context]
+  (let [{{addr :addr} :host} context
+        zmq-in (async/chan (async/sliding-buffer 64))
         zmq-out (async/chan (async/sliding-buffer 64))]
     (register-socket! {:in zmq-in :out zmq-out :socket-type :router
                        :configurator (fn [socket] (.bind socket addr))})
     (println "I: bound decide-host to" addr)
-    {:addr addr
-     :in zmq-in
-     :out zmq-out}))
+    (merge-in context {:host {:in zmq-in
+                              :out zmq-out}})))
 
-(defn start! [dburi addr]
-  (let [context {:database (db/connect! dburi)
-                 :server (start-zmq-server addr)}]
-    (assoc context
-           :heartbeat (start-heartbeat context 2000)
-           :msg-handler (start-message-handler context))))
+(defn start! [context]
+  (let [c1 (assoc context :database (db/connect! (get-in context [:database :uri])))
+        c2 (start-zmq-server c1)]
+    (assoc c2
+           :heartbeat (start-heartbeat c2 2000)
+           :msg-handler (start-message-handler c2))))
 
 (defn stop! [context]
-  (async/close! (get-in context [:server :in]))
+  (async/close! (get-in context [:host :in]))
   (async/put! (get-in context [:heartbeat :ctrl]) :stop))
