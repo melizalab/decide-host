@@ -2,8 +2,8 @@
   (:gen-class)
   (:require [frodo.web :refer [App]]
             [ring.util.response :refer [response content-type]]
-            [ring.middleware.format :refer [wrap-restful-format]]
             [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
+            [ring.middleware.format-response :refer [wrap-restful-response wrap-json-response]]
             [compojure.core :refer [routes context GET]]
             [compojure.route :refer [resources]]
             [decide-host.config :refer [init-context]]
@@ -12,6 +12,14 @@
             [decide-host.database :as db]
             [decide-host.aggregators :as agg]
             [decide-host.handlers :refer [add-handler update-subject!]]))
+
+(defn parse-comment-constraint
+  "If :comments is true, removes any filter for comments; otherwise "
+  [params]
+  (case (:comment params)
+    "true" (dissoc params :comment)
+    nil (assoc params :comment nil)
+    params))
 
 (defn controller-view
   [addr]
@@ -28,9 +36,10 @@
 (defn trial-view
   [db params]
   (let [params (-> params
-                     (db/parse-time-constraint :before)
-                     (db/parse-time-constraint :after))]
-    #_(println "D: trial-view" params)
+                   (parse-comment-constraint)
+                   (db/parse-time-constraint :before)
+                   (db/parse-time-constraint :after))]
+    (println "D: trial-view" params)
     (db/find-trials db params)))
 
 (defn site-routes [ctx]
@@ -58,6 +67,8 @@
         {:context ctx
          :frodo/handler (-> (site-routes ctx)
                             (wrap-defaults api-defaults)
-                            (wrap-restful-format :formats [:json-kw :edn]))}))
+                            #_(wrap-restful-response :formats [:json-kw :edn
+                                                             :transit-json :transit-msgpack])
+                            (wrap-json-response :pretty true))}))
     (stop! [_ system]
       (host/stop! (:context system)))))

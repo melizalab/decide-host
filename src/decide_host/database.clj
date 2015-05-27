@@ -3,6 +3,7 @@
             [monger.joda-time]
             [monger.core :as mg]
             [monger.collection :as mc]
+            [monger.conversion :refer [to-db-object from-db-object]]
             [monger.result :refer [ok? updated-existing?]]
             [monger.operators :refer :all]
             [clj-time.core :as t]
@@ -102,7 +103,10 @@
 (defn find-trials
   [db query]
   (let [query (convert-subject-uuid query)]
-    (mc/find-maps db trial-coll query {:_id 0})))
+    (map from-db-object
+         (.sort (mc/find db trial-coll query {:_id 0})
+                (to-db-object {:time 1}))
+         (repeat true))))
 
 (defn log-message! [db data-type data-id data]
   (if-let [coll (case data-type
