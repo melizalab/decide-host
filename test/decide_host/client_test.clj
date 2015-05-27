@@ -1,15 +1,20 @@
 (ns decide-host.client-test
   (:require [midje.sweet :refer :all]
-            [decide-host.host :as host :refer [to-string get-config]]
-            [decide-host.database :refer [connect!]]
+            [decide-host.core :refer [to-string]]
+            [decide-host.host :as host]
             [com.keminglabs.zmq-async.core :refer [register-socket!]]
             [clojure.core.async :as async :refer [>! <! >!! <!!]]
             [monger.core :as mg]
             [cheshire.core :as json]))
 
 (def test-db "decide-test")
-(def test-uri (str "mongodb://localhost/" test-db))
+(def protocol "decide-host@1")
 (def server-address "tcp://127.0.0.1:5556")
+
+(defn init-context []
+  {:database {:uri (str "mongodb://localhost/" test-db)}
+   :host {:protocol protocol
+          :addr server-address}})
 
 (defn connect-client [addr]
   (let [zmq-in (async/chan (async/sliding-buffer 64))
@@ -21,13 +26,9 @@
     {:in zmq-in
      :out zmq-out}))
 
-(defn start-host [addr]
-  (let [context {:database (connect! test-uri)
-                 :server (host/start-zmq-server addr)}]
-    (mg/drop-db (get-in context [:database :conn]) test-db)
-    (assoc context
-           :heartbeat (host/start-heartbeat context 2000)
-           :msg-handler (host/start-message-handler context))))
+(defn start-host [context]
+  (let [context (host/start! context)]
+    (mg/drop-db (get-in context [:database :conn]) test-db)))
 
 (defn parse-message [rep]
   (if (seq? rep)
@@ -55,7 +56,7 @@
 
 ;; most of the request-reply logic is tested in core-test and is not duplicated
 ;; here. Mostly we want to check that heartbeating works as expected.
-#_(let [context (start-host server-address)]
+#_(let [context (start-host (init-context))]
   (fact-group :integration "client-server integration"
     (let [{:keys [in out]} (connect-client server-address)
           hugz (hugger in out)]

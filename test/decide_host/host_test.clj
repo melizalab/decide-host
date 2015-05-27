@@ -7,7 +7,7 @@
             [cheshire.core :as json]))
 
 (def test-db "decide-test")
-(def test-uri (str "mongodb://localhost/" test-db))
+(def protocol "decide-host@1")
 
 (def example-event {:name "cue_left_green,"
                     :time 1431981358138587
@@ -20,6 +20,10 @@
                     :subject "bef9a524-10cf-4cb2-8f6d-d1eeed3d3725"
                     :time 1431981358138587})
 
+(defn init-context []
+  {:database {:uri (str "mongodb://localhost/" test-db)}
+   :host {:protocol protocol}})
+
 (defn count-controllers [context]
   (count (db/get-living-controllers (get-in context [:database :db]))))
 (defn reset-database [context]
@@ -30,14 +34,14 @@
     (decode-pub "garbage") => nil
     (decode-pub "{\"a\":1}") => {:a 1})
 
-(let [ctx {:database (db/connect! test-uri)}
+(let [ctx (init-context)
+      ctx (assoc ctx :database (db/connect! (get-in ctx [:database :uri])))
       {{db :db} :database} ctx
       subject "acde" sock-id "test-ctrl" addr "test" procedure "testing"
       data-id "data-id"
       event-msg (json/encode example-event)
       trial-msg (json/encode example-trial)]
-  (reset-database ctx)
-  (with-state-changes [(after :facts (reset-database ctx))]
+  (with-state-changes [(before :facts (reset-database ctx))]
     (fact "only one connection per controller"
         (connect! ctx sock-id addr) => :ok
         (connect! ctx "another-socket" addr) => :wtf
@@ -58,6 +62,7 @@
         (disconnect! ctx sock-id)
         (count-controllers ctx) => 0
         (connect! ctx sock-id addr) => :ok))
+  (reset-database ctx)
   (fact "processing incoming messages"
     (fact "unrecognized messages rejected"
         (process-message! ctx sock-id "WHODAT") => (just ["RTFM" anything]))
@@ -68,10 +73,10 @@
         (fact "rejects wrong protocol"
             (process-message! ctx sock-id "OHAI" "garble") => (just ["RTFM" anything]))
       (fact "accepts correct handshake"
-          (process-message! ctx sock-id "OHAI" (get-config :protocol) addr) => ["OHAI-OK"]
+          (process-message! ctx sock-id "OHAI" protocol addr) => ["OHAI-OK"]
           (count-controllers ctx) => 1)
       (fact "does not accept connections from other sockets when controller is alive"
-          (process-message! ctx "other-id" "OHAI" (get-config :protocol) addr) => (just ["WTF" anything])))
+          (process-message! ctx "other-id" "OHAI" protocol addr) => (just ["WTF" anything])))
     (fact "use-peering"
         (fact "responds to heartbeats"
             (process-message! ctx sock-id "HUGZ") => ["HUGZ-OK"])
