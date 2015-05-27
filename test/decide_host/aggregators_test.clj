@@ -1,14 +1,15 @@
 (ns decide-host.aggregators-test
   (:require [midje.sweet :refer :all]
+            [decide-host.core :refer [uuid]]
             [decide-host.aggregators :refer :all]
-            [decide-host.database :refer [connect! uuid ctrl-coll subj-coll trial-coll]]
+            [decide-host.database :refer [connect! ctrl-coll subj-coll trial-coll]]
             [monger.core :as mg]
             [monger.collection :as mc]
             [clj-time.core :as t]))
 
 (def test-db "decide-test")
 (def test-uri (str "mongodb://localhost/" test-db))
-(def tbase (today-local-midnight))
+(def tbase (t/today))
 (def my-uuid (uuid "bef9a524-10cf-4cb2-8f6d-d1eeed3d3725"))
 (def controller {:addr "pica",
                  :zmq-id "706963612d6374726c",

@@ -4,13 +4,7 @@
             [decide-host.database :refer [trial-coll event-coll]]
             [monger.collection :as mc]
             [monger.operators :refer :all]
-            [clj-time.core :as t]
-            [clj-time.coerce :as tc]))
-
-(defn today-local-midnight
-  "Returns the time at the start of the day in local time"
-  []
-  (t/from-time-zone (t/today-at 0 0) (t/default-time-zone)))
+            [clj-time.core :as t]))
 
 (defn merge-query [base restrict]
   (merge-in base (apply hash-map restrict)))
@@ -27,7 +21,7 @@
   subject in the database. The query can be restricted by providing additional
   query keywords (e.g., :subject subj-id)"
   [db & restrict]
-  (let [midnight (today-local-midnight)
+  (let [midnight (t/today)
         query (merge-query {:time {$gte midnight} :comment nil} restrict)]
     (mc/aggregate db trial-coll [{$match query}
                                  {$group { :_id "$subject" :result {$sum 1}}}]))  )
@@ -39,7 +33,7 @@
   subject in the database. The query can be restricted by providing additional
   query keywords (e.g., :subject subj-id)"
   [db & restrict]
-  (let [midnight (today-local-midnight)
+  (let [midnight (t/today)
         query (merge-query {:time {$gte midnight} :result "feed"} restrict)]
     (mc/aggregate db trial-coll [{$match query}
                                   {$group { :_id "$subject" :result {$sum 1}}}])))
