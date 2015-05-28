@@ -15,8 +15,6 @@
 (def subj-coll "subjects")
 (def ctrl-coll "controllers")
 
-(def ^:private init-alive 10)
-
 (def ^:private time-keyops {:before $lte
                             :after $gte})
 
@@ -54,21 +52,21 @@
 
 (defn set-alive!
   "Sets aliveness for controller entry"
-  [db sock-id] (mc/update db ctrl-coll
-                          {:zmq-id sock-id}
-                          {$set {:alive init-alive :last-seen (t/now)}}))
+  [db sock-id val] (mc/update db ctrl-coll
+                              {:zmq-id sock-id}
+                              {$set {:alive val :last-seen (t/now)}}))
 
 (defn dec-alive!
   "Decrements aliveness counter for controller"
   [db sock-id] (mc/update db ctrl-coll {:zmq-id sock-id} {$inc {:alive -1}}))
 
-(defn get-controller-by-socket
+(defn find-controller-by-socket
   [db sock-id]
   (mc/find-one-as-map db ctrl-coll {:zmq-id sock-id}))
-(defn get-controller-by-addr [db addr] (mc/find-one-as-map db ctrl-coll {:addr addr}))
+(defn find-controller-by-addr [db addr] (mc/find-one-as-map db ctrl-coll {:addr addr}))
 
-(defn get-living-controllers [db] (mc/find-maps db ctrl-coll {:alive {$gt 0}}))
-(defn get-controllers [db] (mc/find-maps db ctrl-coll))
+(defn find-controllers [db & [{:as query}]]
+  (mc/find-maps db ctrl-coll query))
 
 (defn start-subject!
   "Updates database when subject starts running an experiment"
@@ -91,12 +89,13 @@
   [db addr data]
   (mc/update db subj-coll {:controller addr} {$set data}))
 
-(defn get-subject [db subject] (when subject (mc/find-map-by-id db subj-coll (uuid subject))))
-(defn get-subject-by-addr [db addr] (mc/find-one-as-map db subj-coll {:controller addr}))
+(defn find-subject [db subject]
+  (when subject (mc/find-map-by-id db subj-coll (uuid subject))))
+(defn find-subject-by-addr [db addr] (mc/find-one-as-map db subj-coll {:controller addr}))
 (defn get-procedure
   "Gets currently running experiment for subject iff the associated controller is alive"
   [db subject]
-  (let [{:keys [controller procedure]} (get-subject db subject)
+  (let [{:keys [controller procedure]} (find-subject db subject)
         ctrl (mc/find-one-as-map db ctrl-coll {:addr controller :alive {$gt 0}})]
     (when ctrl procedure)))
 

@@ -22,16 +22,16 @@
     params))
 
 (defn controller-view
-  [addr]
-  (str "controller data for " addr))
+  [db params]
+  (map #(select-keys % [:addr :last-seen]) (db/find-controllers db params)))
 
 (defn event-view
-  [addr]
-  (str "events for " addr))
+  [db params]
+  (str "events for " (:addr params)))
 
 (defn subject-view
   [subj-id]
-  (str "subjedt data for " subj-id))
+  (str "subject data for " subj-id))
 
 (defn trial-view
   [db params]
@@ -39,18 +39,26 @@
                    (parse-comment-constraint)
                    (db/parse-time-constraint :before)
                    (db/parse-time-constraint :after))]
-    (println "D: trial-view" params)
+    #_(println "D: trial-view" params)
     (db/find-trials db params)))
+
+(defn stats-view
+  [db params]
+  (let [params (-> params
+                   (db/parse-time-constraint :before)
+                   (db/parse-time-constraint :after))]
+    (println "D: stats-view" params)
+    ))
 
 (defn site-routes [ctx]
   (let [{{db :db} :database} ctx]
     (routes
      (GET "/" [] "hello world")
      (context "/controllers" []
-       (GET "/" [] "all controllers")
-       (GET "/active" [] "active controllers")
+       (GET "/" [] (controller-view db {}))
        (context "/:addr" [addr]
-         (GET "/" [] (controller-view addr))))
+         (GET "/" [] (controller-view db {:addr addr}))
+         (GET "/events" [:as {params :params}] (event-view db params))))
      (context "/subjects" []
        (GET "/" [] "all subjects")
        (GET "/active" [] "active subjects")

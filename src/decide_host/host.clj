@@ -24,11 +24,15 @@
     (json/parse-string (to-string bytes) true)
     (catch Exception e nil)))
 
+(defn set-alive! [context id]
+  (let [{{db :db} :database {val :heartbeat-init-alive} :host} context]
+    (db/set-alive! db id val)) nil)
+
 (defn connect!
   "Registers a controller as connected. :ok if successful, :wtf if the address is taken"
   [context sock-id ctrl-addr]
   (let [{{db :db} :database} context
-        {:keys [alive zmq-id]} (db/get-controller-by-addr db ctrl-addr)]
+        {:keys [alive zmq-id]} (db/find-controller-by-addr db ctrl-addr)]
     (match [(or alive 0) zmq-id]
            ;; another OHAI from existing client - noop
            [(_ :guard pos?) sock-id] :ok
@@ -38,7 +42,7 @@
            :else (do
                    (println "I:" ctrl-addr "connected")
                    (db/add-controller! db sock-id ctrl-addr)
-                   (db/set-alive! db sock-id)
+                   (set-alive! context sock-id)
                    :ok))))
 
 (defn disconnect!
@@ -46,12 +50,10 @@
   (let [{{db :db} :database} context
         flags (set flags)
         err (:err flags)]
-    (when-let [controller (db/get-controller-by-socket db sock-id)]
+    (when-let [controller (db/find-controller-by-socket db sock-id)]
       ;; TODO notify user if error
       (println "I:" (:addr controller) "disconnected" (if err "unexpectedly" "")))
     (db/remove-controller! db sock-id)) nil)
-
-(defn set-alive! [db id] (db/set-alive! db id) nil)
 
 (defn store-data!
   "Stores PUB data in the database. Returns :ack on success, :dup for duplicate
@@ -60,8 +62,8 @@
   [context id data-type data-id data]
   #_(println "D: storing data" id data-type data-id data)
   (let [{{db :db} :database event-c :event-chan} context]
-    (set-alive! db id)
-    (if-let [addr (:addr (db/get-controller-by-socket db id))]
+    (set-alive! context id)
+    (if-let [addr (:addr (db/find-controller-by-socket db id))]
       (if-let [data (decode-pub data)]
         (let [time (:time data)
               data (assoc data
@@ -98,9 +100,9 @@
              :rtfm-fmt   ["RTFM" "error parsing data"])
            ["HUGZ" _ _ _]
            (do
-             (set-alive! db id)
+             (set-alive! context id)
              ["HUGZ-OK"])
-           ["HUGZ-OK" _ _ _] (set-alive! db id)
+           ["HUGZ-OK" _ _ _] (set-alive! context id)
 
            ;; close-peering
            ["KTHXBAI" _ _ _] (disconnect! context id)
@@ -146,7 +148,7 @@
       (loop []
         (let [[x _] (async/alts! [ctrl-chan (async/timeout interval)])]
           (when (not= x :stop)
-            (dorun (map check-connection! (repeat context) (db/get-controllers db)))
+            (dorun (map check-connection! (repeat context) (db/find-controllers db)))
             (recur))))
       #_(println "D: heartbeat handler stopping"))
     {:ctrl ctrl-chan}))

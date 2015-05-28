@@ -21,11 +21,13 @@
                     :time 1431981358138587})
 
 (defn init-context []
-  {:database {:uri (str "mongodb://localhost/" test-db)}
-   :host {:protocol protocol}})
+  (let [ctx {:database {:uri (str "mongodb://localhost/" test-db)}
+             :host {:protocol protocol
+                    :heartbeat-init-alive 1}}]
+    (assoc ctx :database (db/connect! (get-in ctx [:database :uri])))))
 
 (defn count-controllers [context]
-  (count (db/get-living-controllers (get-in context [:database :db]))))
+  (count (db/find-controllers (get-in context [:database :db]))))
 (defn reset-database [context]
   (mg/drop-db (get-in context [:database :conn]) test-db))
 
@@ -35,7 +37,6 @@
     (decode-pub "{\"a\":1}") => {:a 1})
 
 (let [ctx (init-context)
-      ctx (assoc ctx :database (db/connect! (get-in ctx [:database :uri])))
       {{db :db} :database} ctx
       subject "acde" sock-id "test-ctrl" addr "test" procedure "testing"
       data-id "data-id"

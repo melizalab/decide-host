@@ -3,8 +3,7 @@
   (:require [decide-host.database :as db]
             [clojure.core.async :as async :refer [>! <! >!! <!!]]
             [clojure.core.match :refer [match]]
-            [clj-time.core :as t]
-            [clj-time.coerce :as tc]))
+            [clj-time.core :as t]))
 
 (defn add-handler
   "Adds an asynchronous handler f to pub for one or more topics"

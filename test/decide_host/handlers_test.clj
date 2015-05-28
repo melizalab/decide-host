@@ -31,10 +31,10 @@
        (fact "updates last-fed for hopper events"
          (update-subject! context {:topic :state-changed :name "hopper" :up 1
                                 :addr addr :time 1234})
-         (db/get-subject db subject) => (contains {:last-fed 1234}))
+         (db/find-subject db subject) => (contains {:last-fed 1234}))
        (fact "updates last-trial for trial events"
          (update-subject! context {:topic :trial-data :subject subject :trial 10 :time 4567})
-         (db/get-subject db subject) => (contains {:last-trial 4567}))
+         (db/find-subject db subject) => (contains {:last-trial 4567}))
        (fact "update-subject updates current experiment"
          (update-subject! context {:topic :trial-data :subject subject :experiment "blah"})
-         (db/get-subject db subject) => (contains {:experiment "blah"})))))
+         (db/find-subject db subject) => (contains {:experiment "blah"})))))

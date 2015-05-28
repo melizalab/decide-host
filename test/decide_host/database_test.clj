@@ -31,29 +31,25 @@
   (with-state-changes [(after :facts (mg/drop-db conn test-db))]
     (fact "about controller state management"
         (fact "bad values return nil"
-              (get-controller-by-addr db nil) => nil
-              (get-controller-by-socket db nil) => nil
-              (get-controller-by-addr db addr) => nil
-              (get-controller-by-socket db sock-id) => nil)
+              (find-controller-by-addr db nil) => nil
+              (find-controller-by-socket db nil) => nil
+              (find-controller-by-addr db addr) => nil
+              (find-controller-by-socket db sock-id) => nil)
         (add-controller! db sock-id addr)
-        (get-controller-by-addr db addr) => (contains {:zmq-id sock-id :addr addr})
-        (get-controller-by-socket db sock-id) => (contains {:zmq-id sock-id :addr addr})
-        (update-controller! db sock-id {:alive INIT-ALIVE})
-        (count (get-living-controllers db)) => 1
-        (update-controller! db sock-id {:alive 0})
-        (count (get-living-controllers db)) => 0
-        )
+        (find-controller-by-addr db addr) => (contains {:zmq-id sock-id :addr addr})
+        (find-controller-by-socket db sock-id) => (contains {:zmq-id sock-id :addr addr})
+        (count (find-controllers db)) => 1)
     (fact "about subject state management"
         (fact "bad values return nil"
-              (get-subject db nil) => nil
-              (get-subject db subject) => nil)
+              (find-subject db nil) => nil
+              (find-subject db subject) => nil)
         (let [data {:controller addr :procedure "testing"}]
           (start-subject! db subject data)
           ;; TODO fix time equality checks
-          (get-subject db subject) => (contains data)
-          (get-subject-by-addr db (:controller data)) => (contains data)
+          (find-subject db subject) => (contains data)
+          (find-subject-by-addr db (:controller data)) => (contains data)
           (stop-subject! db addr)
-          (get-subject db subject) => (contains {:controller nil :procedure nil})))
+          (find-subject db subject) => (contains {:controller nil :procedure nil})))
     (fact "about logging messages"
         (let [oid (.toString (object-id))
               message {:subject "acde" :time 12345}]
