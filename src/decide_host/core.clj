@@ -9,14 +9,14 @@
 
 (defn bytes-to-hex [x] (when-not (nil? x) (apply str (map #(format "%02x" %) x))))
 
-(defn hex-to-bytes [x] (.toByteArray (BigInteger. x 16)))
+(defn hex-to-bytes [^String x] (.toByteArray (BigInteger. x 16)))
 
 (defn object-id
   "Returns a new BSON ObjectID, either newly generated or from a string
   argument. If the string can't be converted to an ObjectID, it's returned
   as-is."
   ([] (ObjectId.))
-  ([x] (try (ObjectId. x)
+  ([^String x] (try (ObjectId. x)
             (catch IllegalArgumentException e x))))
 
 (defn uuid

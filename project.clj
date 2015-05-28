@@ -24,6 +24,7 @@
 
   :plugins [[jarohen/lein-frodo "0.4.1"]]
   :frodo/config-resource "config/nomad-config.edn"
+  ;; :global-vars {*warn-on-reflection* true}
 
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}

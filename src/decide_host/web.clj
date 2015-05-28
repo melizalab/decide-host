@@ -14,24 +14,37 @@
             [decide-host.handlers :refer [add-handler update-subject!]]))
 
 (defn parse-comment-constraint
-  "If :comments is true, removes any filter for comments; otherwise "
+  "If :comment is 'true', removes any filter for comments; otherwise "
   [params]
   (case (:comment params)
     "true" (dissoc params :comment)
     nil (assoc params :comment nil)
     params))
 
-(defn controller-view
+(defn controller-list-view
+  "Returns a list of all controllers in the database"
   [db params]
   (map #(select-keys % [:addr :last-seen]) (db/find-controllers db params)))
 
-(defn event-view
+(defn controller-view
+  [db addr]
+  {:body (first (controller-list-view db {:addr addr}))})
+
+(defn subject-list-view
   [db params]
-  (str "events for " (:addr params)))
+  (db/find-subjects db params))
 
 (defn subject-view
-  [subj-id]
-  (str "subject data for " subj-id))
+  [db subject]
+  (str "subject data for " subject))
+
+(defn event-view
+  [db params]
+  (let [params (-> params
+                   (db/parse-time-constraint :before)
+                   (db/parse-time-constraint :after))]
+    (println "D: event-view" params)
+    (db/find-events db params)))
 
 (defn trial-view
   [db params]
@@ -53,18 +66,19 @@
 (defn site-routes [ctx]
   (let [{{db :db} :database} ctx]
     (routes
-     (GET "/" [] "hello world")
-     (context "/controllers" []
-       (GET "/" [] (controller-view db {}))
+     (GET "/" [] {:body {:hello "world"}})
+     (context "/controllers" [:as {params :params}]
+       (GET "/" [] (controller-list-view db params))
        (context "/:addr" [addr]
-         (GET "/" [] (controller-view db {:addr addr}))
-         (GET "/events" [:as {params :params}] (event-view db params))))
-     (context "/subjects" []
-       (GET "/" [] "all subjects")
+         (GET "/" [] (controller-view db addr))
+         (GET "/events" [] (event-view db params))))
+     (context "/subjects" [:as {params :params}]
+       (GET "/" [] (subject-list-view db params))
        (GET "/active" [] "active subjects")
-       (context "/:subject" [subject]
-         (GET "/" [] (subject-view subject))
-         (GET "/trials" [:as {params :params}] (trial-view db params))))
+       (context "/:subject" [subject ]
+         (GET "/" [] (subject-view db subject))
+         (GET "/trials" [] (trial-view db params))
+         (GET "/stats" [] (stats-view db params))))
      (resources "/"))))
 
 (def app

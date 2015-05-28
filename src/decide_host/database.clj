@@ -18,6 +18,7 @@
 (def ^:private time-keyops {:before $lte
                             :after $gte})
 
+;;; data functions
 (defn parse-time-constraint
   "Parses parameter to appropriate mongodb query operator."
   [params key]
@@ -27,14 +28,15 @@
       (merge-in (dissoc params key) {:time {op (tc/from-long (Long. time))}})
       (catch NumberFormatException e params))))
 
-(defn connect!
-  "Connect to a mongodb database. Returns map with :conn and :db"
-  [uri]
-  (let [res (mg/connect-via-uri uri)]
-    (mg/get-db-names (:conn res))       ; will throw error for bad connection
-    (println "I: connected to database at" uri)
-    (assoc res :uri uri)))
+(defn- find-and-sort
+  [db coll query sort]
+  (map from-db-object
+       (.sort (mc/find db coll query {:_id 0})
+              (to-db-object sort))
+       (repeat true)))
 
+;;; database manipulation
+;; controllers
 (defn add-controller!
   [db sock-id addr]
   (mc/update db ctrl-coll
@@ -60,14 +62,7 @@
   "Decrements aliveness counter for controller"
   [db sock-id] (mc/update db ctrl-coll {:zmq-id sock-id} {$inc {:alive -1}}))
 
-(defn find-controller-by-socket
-  [db sock-id]
-  (mc/find-one-as-map db ctrl-coll {:zmq-id sock-id}))
-(defn find-controller-by-addr [db addr] (mc/find-one-as-map db ctrl-coll {:addr addr}))
-
-(defn find-controllers [db & [{:as query}]]
-  (mc/find-maps db ctrl-coll query))
-
+;; subjects
 (defn start-subject!
   "Updates database when subject starts running an experiment"
   [db subject data]
@@ -89,24 +84,7 @@
   [db addr data]
   (mc/update db subj-coll {:controller addr} {$set data}))
 
-(defn find-subject [db subject]
-  (when subject (mc/find-map-by-id db subj-coll (uuid subject))))
-(defn find-subject-by-addr [db addr] (mc/find-one-as-map db subj-coll {:controller addr}))
-(defn get-procedure
-  "Gets currently running experiment for subject iff the associated controller is alive"
-  [db subject]
-  (let [{:keys [controller procedure]} (find-subject db subject)
-        ctrl (mc/find-one-as-map db ctrl-coll {:addr controller :alive {$gt 0}})]
-    (when ctrl procedure)))
-
-(defn find-trials
-  [db query]
-  (let [query (convert-subject-uuid query)]
-    (map from-db-object
-         (.sort (mc/find db trial-coll query {:_id 0})
-                (to-db-object {:time 1}))
-         (repeat true))))
-
+;; events and trials
 (defn log-message! [db data-type data-id data]
   (if-let [coll (case data-type
                     "state-changed" event-coll
@@ -119,3 +97,51 @@
                                           {:upsert true}))
           :dup :ack))
       :rtfm-dtype))
+
+;;; database query functions
+;; controllers
+(defn find-controller-by-socket
+  [db sock-id]
+  (mc/find-one-as-map db ctrl-coll {:zmq-id sock-id}))
+(defn find-controller-by-addr [db addr] (mc/find-one-as-map db ctrl-coll {:addr addr}))
+
+(defn find-controllers [db & [{:as query}]]
+  (mc/find-maps db ctrl-coll query))
+
+;; subjects
+(defn find-subject [db subject]
+  (when subject (mc/find-map-by-id db subj-coll (uuid subject))))
+
+(defn find-subject-by-addr [db addr] (mc/find-one-as-map db subj-coll {:controller addr}))
+
+(defn get-procedure
+  "Gets currently running experiment for subject iff the associated controller is alive"
+  [db subject]
+  (let [{:keys [controller procedure]} (find-subject db subject)
+        ctrl (mc/find-one-as-map db ctrl-coll {:addr controller :alive {$gt 0}})]
+    (when ctrl procedure)))
+
+(defn find-subjects
+  "Gets subjects in database, limited by query"
+  [db query]
+  (mc/find-maps db subj-coll (convert-subject-uuid query)))
+
+;; trials and events
+(defn find-trials
+  [db query]
+  (let [query (convert-subject-uuid query)]
+    (find-and-sort db trial-coll query {:time 1})))
+
+(defn find-events
+  [db query]
+  (let [query (convert-subject-uuid query)]
+    (find-and-sort db event-coll query {:time 1})))
+
+;;; convenience methods
+(defn connect!
+  "Connect to a mongodb database. Returns map with :conn and :db"
+  [uri]
+  (let [res (mg/connect-via-uri uri)]
+    (mg/get-db-names (:conn res))       ; will throw error for bad connection
+    (println "I: connected to database at" uri)
+    (assoc res :uri uri)))
