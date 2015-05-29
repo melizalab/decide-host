@@ -2,7 +2,7 @@
   (:require [midje.sweet :refer :all]
             [decide-host.core :refer [uuid]]
             [decide-host.aggregators :refer :all]
-            [decide-host.database :refer [connect! ctrl-coll subj-coll trial-coll]]
+            [decide-host.database :as db :refer [ctrl-coll subj-coll trial-coll]]
             [monger.core :as mg]
             [monger.collection :as mc]
             [clj-time.core :as t]))
@@ -10,13 +10,14 @@
 (def test-db "decide-test")
 (def test-uri (str "mongodb://localhost/" test-db))
 (def tbase (t/today))
-(def my-uuid (uuid "bef9a524-10cf-4cb2-8f6d-d1eeed3d3725"))
+(def subj-id "bef9a524-10cf-4cb2-8f6d-d1eeed3d3725")
+(def subj-uuid (uuid subj-id))
 (def controller {:addr "pica",
                  :zmq-id "706963612d6374726c",
                  :alive 10,
                  :last-seen tbase})
 
-(def subject {:_id my-uuid
+(def subject {:_id subj-uuid
               :controller "pica"
               :procedure "gng"
               :experiment "gng-example"
@@ -41,7 +42,7 @@
                   :experiment "gng-example",
                   :comment "starting",
                   :version "2.0.0-SNAPSHOT",
-                  :subject my-uuid,
+                  :subject subj-uuid,
                   :stimset
                   [{:name "st15_ac3",
                     :frequency 1,
@@ -71,7 +72,7 @@
                   :stimulus "st15_ac3",
                   :program "gng",
                   :rtime 817852,
-                  :subject my-uuid,
+                  :subject subj-uuid,
                   :correct true}
                  {:response "peck_right",
                   :category "S-",
@@ -85,7 +86,7 @@
                   :stimulus ["st15_ac4" "st15_ac8"],
                   :program "gng",
                   :rtime 422333,
-                  :subject my-uuid,
+                  :subject subj-uuid,
                   :correct false}
                  {:response "peck_right",
                   :category "S-",
@@ -99,7 +100,7 @@
                   :stimulus ["st15_ac4" "st15_ac8"],
                   :program "gng",
                   :rtime 354824,
-                  :subject my-uuid,
+                  :subject subj-uuid,
                   :correct false}
                  {:response "timeout",
                   :category "S-",
@@ -113,7 +114,7 @@
                   :stimulus ["st15_ac4" "st15_ac8"],
                   :program "gng",
                   :rtime nil,
-                  :subject my-uuid,
+                  :subject subj-uuid,
                   :correct true}
                  {:response "peck_right",
                   :category "S+",
@@ -127,7 +128,7 @@
                   :stimulus "st15_ac3",
                   :program "gng",
                   :rtime 682408,
-                  :subject my-uuid,
+                  :subject subj-uuid,
                   :correct true}])
 
 (defn setup-db []
@@ -138,23 +139,22 @@
     (mc/insert-batch db trial-coll trial-data)
     db))
 
-(fact "about rekey-result"
-    (rekey-result :_id {:_id my-uuid :result "blah"}) => {my-uuid "blah"}
-    (rekey-result :_id {:_id my-uuid :a 1 :b 2}) => {my-uuid {:a 1 :b 2}})
-
-(let [db (setup-db)]
-  #_(fact "aggregate results"
-      (first (all-stats db)) => (just {:_id my-uuid
-                                       :trials-today 5
-                                       :feed-ops-today 2
-                                       :recent-accuracy {:since anything
-                                                         :trials 4
-                                                         :correct 2}}))
-  (fact "trials-today counts number of trials"
-      (trials-today db) => [{:_id my-uuid :result 5}]
-      (trials-today db :subject my-uuid) => [{:_id my-uuid :result 5}]
-      (trials-today db :subject "blah blah") => [])
-  (fact "feed-ops-today counts number of trials with feed outcomes"
-      (feed-ops-today db) => [{:_id my-uuid :result 2}]
-      (feed-ops-today db :subject my-uuid) => [{:_id my-uuid :result 2}]
-      (feed-ops-today db :subject "blah blah") => []))
+(let [db (setup-db)
+      subj-record (db/find-subject db subj-id)
+      last-hour (t/minus (t/now) (t/hours 1))]
+  (fact "join-controller"
+      (:controller (join-controller db subj-record)) => (contains {:addr "pica"}))
+  (fact "join-activity"
+      (join-activity db (t/today) :today subj-record) => (contains {:today {:trials 5
+                                                                            :feed-ops 2
+                                                                            :correct 3}})
+      (join-activity db last-hour :recent subj-record) => (contains {:recent {:trials 4
+                                                                              :feed-ops 1
+                                                                              :correct 2}}))
+  (fact "join-all gives nils for missing subjects"
+      (join-all db {:_id "doofus"}) => (contains {:today nil
+                                                  :last-hour nil
+                                                  :controller nil})
+      (join-all db {}) => (contains {:today nil
+                                     :last-hour nil
+                                     :controller nil})))

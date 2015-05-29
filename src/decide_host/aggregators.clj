@@ -1,7 +1,7 @@
 (ns decide-host.aggregators
   "Functions that make calculations on aggregate data"
   (:require [decide-host.core :refer [merge-in]]
-            [decide-host.database :refer [trial-coll event-coll]]
+            [decide-host.database :as db :refer [trial-coll event-coll]]
             [monger.collection :as mc]
             [monger.operators :refer :all]
             [clj-time.core :as t]))
@@ -9,61 +9,32 @@
 (defn merge-query [base restrict]
   (merge-in base (apply hash-map restrict)))
 
-(defn rekey-result
-  [key map]
-  (let [newkey (key map)]
-    (if-let [result (:result map)]
-      {newkey result}
-      {newkey (dissoc map key)})))
-
-(defn trials-today
-  "Returns a sequence of maps giving the number of trials run today by each
-  subject in the database. The query can be restricted by providing additional
-  query keywords (e.g., :subject subj-id)"
-  [db & restrict]
-  (let [midnight (t/today)
-        query (merge-query {:time {$gte midnight} :comment nil} restrict)]
-    (mc/aggregate db trial-coll [{$match query}
-                                 {$group { :_id "$subject" :result {$sum 1}}}]))  )
-
 ;; it might be more useful to calculate the total amount of time the hopper has
 ;; been up, but that's fairly difficult to do
-(defn feed-ops-today
-  "Returns a sequence of maps giving the number of trials run today by each
-  subject in the database. The query can be restricted by providing additional
-  query keywords (e.g., :subject subj-id)"
-  [db & restrict]
-  (let [midnight (t/today)
-        query (merge-query {:time {$gte midnight} :result "feed"} restrict)]
-    (mc/aggregate db trial-coll [{$match query}
-                                  {$group { :_id "$subject" :result {$sum 1}}}])))
+(defn join-activity
+  "Calculates statistics for :subject in map and adds result to map
+  under :today. Result is nil if no trials found for subject."
+  [db since key map]
+  (let [{subj :_id :as result} map
+        match {:time {$gte since} :comment nil :subject subj}
+        [a] (mc/aggregate db trial-coll
+                       [{$match match}
+                        {$project {:fed {$cond [{"$eq" ["$result" "feed"]} 1 0]}
+                                   :correct {$cond ["$correct" 1 0]}}}
+                        {$group {:_id nil
+                                 :feed-ops {$sum "$fed"}
+                                 :correct {$sum "$correct"}
+                                 :trials {$sum 1}}}])]
+    (assoc result key (when a (select-keys a [:feed-ops :correct :trials])))))
 
-(defn recent-accuracy
-  "Returns a sequence of maps giving the number of correct responses given in
-  the last interval by each subject in the database. The query can be
-  restricted by providing additional query keywords (e.g., :subject subj-id)"
-  [db & restrict]
-  ;; TODO accept :interval as keyword
-  (let [interval (t/hours 1)
-        mark (t/minus (t/now) interval)
-        query (merge-query {:time {$gte mark} :comment nil} restrict)]
-    ;; have to convert booleans to numerical values
-    (println "D: query" query)
-    (mc/aggregate db trial-coll
-                  [{$match query}
-                   {$project {:subject 1 :correct {$cond ["$correct" 1 0]}
-                              :since {"$literal" mark}}}
-                   {$group {:_id "$subject" :since {$first "$since"}
-                            :trials {$sum 1} :correct {$sum "$correct"}}}])))
+(defn join-controller
+  [db {a :controller :as subj}]
+  (let [ctrl (db/find-controller-by-addr db a {:_id 0})]
+    (assoc subj :controller (when (:alive ctrl) (select-keys ctrl [:addr :last-seen])))))
 
-(defn all-stats
-  [db & restrict]
-
-  )
-
-#_(defn subjects
-  [db & restrict]
-  (let [subjects (mc/find db trial-coll (hash-map restrict))
-        agg-fun (juxt trials-today feed-ops-today recent-accuracy)
-        aggregates (apply agg-fun db restrict)]
-    (join-on :_id subjects)))
+(defn join-all
+  [db subject]
+  (->> subject
+       (join-controller db)
+       (join-activity db (t/today) :today)
+       (join-activity db (t/minus (t/now) (t/hours 1)) :last-hour)))

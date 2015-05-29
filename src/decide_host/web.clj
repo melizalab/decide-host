@@ -32,11 +32,12 @@
 
 (defn subject-list-view
   [db params]
-  (db/find-subjects db params))
+  (println "D: subject-list-view" params)
+  (map (partial agg/join-all db) (db/find-subjects db params)))
 
 (defn subject-view
   [db subject]
-  (str "subject data for " subject))
+  {:body (agg/join-all db (db/find-subject db subject))})
 
 (defn event-view
   [db params]
@@ -74,7 +75,7 @@
          (GET "/events" [] (event-view db params))))
      (context "/subjects" [:as {params :params}]
        (GET "/" [] (subject-list-view db params))
-       (GET "/active" [] "active subjects")
+       (GET "/active" [] (subject-list-view db (merge params {:controller {"$ne" nil}})))
        (context "/:subject" [subject ]
          (GET "/" [] (subject-view db subject))
          (GET "/trials" [] (trial-view db params))

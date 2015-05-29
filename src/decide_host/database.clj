@@ -103,7 +103,9 @@
 (defn find-controller-by-socket
   [db sock-id]
   (mc/find-one-as-map db ctrl-coll {:zmq-id sock-id}))
-(defn find-controller-by-addr [db addr] (mc/find-one-as-map db ctrl-coll {:addr addr}))
+(defn find-controller-by-addr
+  ([db addr] (mc/find-one-as-map db ctrl-coll {:addr addr}))
+  ([db addr fields] (mc/find-one-as-map db ctrl-coll {:addr addr} fields)))
 
 (defn find-controllers [db & [{:as query}]]
   (mc/find-maps db ctrl-coll query))
@@ -123,7 +125,7 @@
 
 (defn find-subjects
   "Gets subjects in database, limited by query"
-  [db query]
+  [db & [{:as query}]]
   (mc/find-maps db subj-coll (convert-subject-uuid query)))
 
 ;; trials and events
