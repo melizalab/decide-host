@@ -130,12 +130,12 @@
 
 ;; trials and events
 (defn find-trials
-  [db query]
+  [db & [{:as query}]]
   (let [query (convert-subject-uuid query)]
     (find-and-sort db trial-coll query {:time 1})))
 
 (defn find-events
-  [db query]
+  [db & [{:as query}]]
   (let [query (convert-subject-uuid query)]
     (find-and-sort db event-coll query {:time 1})))
 

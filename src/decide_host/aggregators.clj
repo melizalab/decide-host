@@ -30,12 +30,16 @@
                        [{$match match}
                         {$project trial-projection}
                         {$group trial-grouping}])]
-    (assoc result key (when a (select-keys a [:feed-ops :correct :trials])))))
+    (if a
+      (assoc result key (select-keys a [:feed-ops :correct :trials]))
+      result)))
 
 (defn join-controller
   [db {a :controller :as subj}]
   (let [ctrl (db/find-controller-by-addr db a {:_id 0})]
-    (assoc subj :controller (when (:alive ctrl) (select-keys ctrl [:addr :last-seen])))))
+    (if (:alive ctrl)
+      (assoc subj :controller (select-keys ctrl [:addr :last-seen]))
+      subj)))
 
 (defn join-all
   [db subject]

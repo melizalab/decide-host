@@ -32,7 +32,7 @@
 
 (defn subject-list-view
   [db params]
-  #_(println "D: subject-list-view" params)
+  (println "D: subject-list-view" params)
   (map (partial agg/join-all db) (db/find-subjects db params)))
 
 (defn subject-view
@@ -44,7 +44,7 @@
   (let [params (-> params
                    (db/parse-time-constraint :before)
                    (db/parse-time-constraint :after))]
-    #_(println "D: event-view" params)
+    (println "D: event-view" params)
     (db/find-events db params)))
 
 (defn trial-view
@@ -53,7 +53,7 @@
                    (parse-comment-constraint)
                    (db/parse-time-constraint :before)
                    (db/parse-time-constraint :after))]
-    #_(println "D: trial-view" params)
+    (println "D: trial-view" params)
     (db/find-trials db params)))
 
 (defn stats-view
@@ -67,7 +67,7 @@
 (defn site-routes [ctx]
   (let [{{db :db} :database} ctx]
     (routes
-     (GET "/" [] {:body {:hello "world"}})
+     (GET "/" [] "Hello world")
      (context "/controllers" [:as {params :params}]
        (GET "/" [] (controller-list-view db params))
        (context "/:addr" [addr]
