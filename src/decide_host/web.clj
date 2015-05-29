@@ -3,9 +3,11 @@
   (:require [frodo.web :refer [App]]
             [ring.util.response :refer [response content-type]]
             [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
-            [ring.middleware.format-response :refer [wrap-restful-response wrap-json-response]]
+            [ring.middleware.format-response :refer [wrap-restful-response
+                                                     wrap-json-response]]
             [compojure.core :refer [routes context GET]]
             [compojure.route :refer [resources]]
+            [hiccup.page :refer [html5 include-css include-js]]
             [decide-host.config :refer [init-context]]
             [decide-host.core :refer [merge-in]]
             [decide-host.host :as host]
@@ -20,6 +22,30 @@
     "true" (dissoc params :comment)
     nil (assoc params :comment nil)
     params))
+
+(defn front-page []
+  (html5
+   [:head
+    [:meta {:charset "utf-8"}]
+    [:meta {:content "initial-scale=1.0, user-scalable=no", :name "viewport"}]
+    [:meta {:content "yes", :name "apple-mobile-web-app-capable"}]
+    [:meta {:content "black", :name "apple-mobile-web-app-status-bar-style"}]
+    [:title "Starboard Directory"]
+    [:link {:rel "icon" :type "image/ico" :href "/images/favicon.ico"}]
+    (include-css "/css/jquery.mobile-1.3.1.min.css")
+    (include-css "/css/directory.css")]
+   [:body
+    [:div#page1 {:data-role "page"}
+     [:div {:data-role "header"}
+      [:h3 "Starboard Directory"]]
+     [:div#console
+      [:p.ahead "Registered Controllers"]
+      [:ul#controller-list]
+      [:p.ahead "Active Subjects"]
+      [:ul#active-subject-list]
+      [:p.ahead "Inactive Subjects"]
+      [:ul#inactive-subject-list]]
+     (include-js "/js/d3.v3.min.js")]]))
 
 (defn controller-list-view
   "Returns a list of all controllers in the database"
@@ -67,7 +93,7 @@
 (defn site-routes [ctx]
   (let [{{db :db} :database} ctx]
     (routes
-     (GET "/" [] "Hello world")
+     (GET "/" [] (-> (front-page) (response) (content-type "text/html")))
      (context "/controllers" [:as {params :params}]
        (GET "/" [] (controller-list-view db params))
        (context "/:addr" [addr]

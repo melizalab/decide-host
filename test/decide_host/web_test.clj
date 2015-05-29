@@ -24,8 +24,6 @@
 (let [db (setup-db)
       addr (:addr controller)
       app (wrap-defaults (site-routes {:database {:db db}}) api-defaults)]
-  (fact "home page"
-      (req app :get "/") => "Hello world")
   (fact "controllers"
       (req app :get (str "/controllers/" addr)) =>
       (contains (select-keys controller [:addr]))
