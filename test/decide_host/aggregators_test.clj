@@ -9,13 +9,13 @@
 
 (def test-db "decide-test")
 (def test-uri (str "mongodb://localhost/" test-db))
-(def tbase (t/today))
+(def midnight (t/today))
 (def subj-id "bef9a524-10cf-4cb2-8f6d-d1eeed3d3725")
 (def subj-uuid (uuid subj-id))
 (def controller {:addr "pica",
                  :zmq-id "706963612d6374726c",
                  :alive 10,
-                 :last-seen tbase})
+                 :last-seen midnight})
 
 (def subject {:_id subj-uuid
               :controller "pica"
@@ -24,7 +24,7 @@
               :user "user@host.com"})
 
 (def trial-data [{:name "gng",
-                  :time tbase
+                  :time midnight
                   :params
                   {:max_corrections 10,
                    :response_window 2000,
@@ -63,7 +63,7 @@
                  {:response "peck_right",
                   :category "S+",
                   :name "gng",
-                  :time (t/plus tbase (t/hours 1))
+                  :time (t/plus midnight (t/hours 1))
                   :addr "pica",
                   :correction 0,
                   :experiment "gng-example",
@@ -157,4 +157,13 @@
                                                   :controller nil})
       (join-all db {}) => (contains {:today nil
                                      :last-hour nil
-                                     :controller nil})))
+                                     :controller nil}))
+  (fact "hourly-stats summarizes correctly"
+      (let [stats (hourly-stats db {:subject subj-id})]
+        (count stats) => 2
+        (first stats) => (contains {:trials 1
+                                    :correct 1
+                                    :feed-ops 1})
+        (second stats) => (contains {:trials 4
+                                    :correct 2
+                                    :feed-ops 1}))))
