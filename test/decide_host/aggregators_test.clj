@@ -1,6 +1,8 @@
 (ns decide-host.aggregators-test
   (:require [midje.sweet :refer :all]
+            [decide-host.database :as db]
             [decide-host.test-data :refer :all]
+            [decide-host.aggregators :refer :all]
             [clj-time.core :as t]))
 
 (let [db (setup-db)

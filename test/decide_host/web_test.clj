@@ -23,7 +23,7 @@
 ;; most functionality is tested in unit tests; focus on query parameters here
 (let [db (setup-db)
       addr (:addr controller)
-      app (wrap-defaults (site-routes {:database {:db db}}) api-defaults)]
+      app (wrap-defaults (api-routes {:database {:db db}}) api-defaults)]
   (fact "controllers"
       (req app :get (str "/controllers/" addr)) =>
       (contains (select-keys controller [:addr]))
@@ -32,6 +32,7 @@
   (fact "subjects"
       (count (req app :get "/subjects")) => 1
       (count (req app :get "/subjects/active")) => 1
+      (count (req app :get "/subjects/inactive")) => 0
       (count (req app :get (str "/subjects?controller=" (:controller subject)))) => 1
       (count (req app :get "/subjects?controller=xyzzy")) => 0
       (req app :get (str "/subjects/" subj-id)) => (contains {:_id subj-uuid})

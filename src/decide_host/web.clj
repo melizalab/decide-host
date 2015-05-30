@@ -5,6 +5,7 @@
             [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
             [ring.middleware.format-response :refer [wrap-restful-response
                                                      wrap-json-response]]
+            [ring.middleware.cors :refer [wrap-cors]]
             [compojure.core :refer [routes context GET]]
             [compojure.route :refer [resources]]
             [hiccup.page :refer [html5 include-css include-js]]
@@ -90,7 +91,7 @@
     (println "D: stats-view" params)
     (agg/hourly-stats db params)))
 
-(defn site-routes [ctx]
+(defn api-routes [ctx]
   (let [{{db :db} :database} ctx]
     (routes
      (GET "/" [] (-> (front-page) (response) (content-type "text/html")))
@@ -102,6 +103,7 @@
      (context "/subjects" [:as {params :params}]
        (GET "/" [] (subject-list-view db params))
        (GET "/active" [] (subject-list-view db (merge params {:controller {"$ne" nil}})))
+       (GET "/inactive" [] (subject-list-view db (merge params {:controller nil})))
        (context "/:subject" [subject ]
          (GET "/" [] (subject-view db subject))
          (GET "/trials" [] (trial-view db params))
@@ -114,10 +116,13 @@
       (let [ctx (host/start! (init-context))]
         (add-handler ctx update-subject! :state-changed :trial-data)
         {:context ctx
-         :frodo/handler (-> (site-routes ctx)
-                            (wrap-defaults api-defaults)
-                            #_(wrap-restful-response :formats [:json-kw :edn
-                                                             :transit-json :transit-msgpack])
-                            (wrap-json-response :pretty true))}))
+         :frodo/handler
+         (-> (api-routes ctx)
+             (wrap-defaults api-defaults)
+             (wrap-cors :access-control-allow-origin #".+"
+                        :access-control-allow-methods [:get])
+             (wrap-restful-response :formats [:json-kw :edn
+                                              :transit-json :transit-msgpack])
+             #_(wrap-json-response :pretty true))}))
     (stop! [_ system]
       (host/stop! (:context system)))))

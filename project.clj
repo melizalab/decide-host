@@ -13,6 +13,7 @@
                  [http-kit "2.1.18"]
                  [hiccup "1.0.5"]
                  [ring-middleware-format "0.4.0"]
+                 [ring-cors "0.1.7"]
 
                  [jarohen/nomad "0.7.1"]
 
