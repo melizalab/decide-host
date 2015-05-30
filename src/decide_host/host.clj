@@ -2,6 +2,7 @@
   "Functions for processing messages from controllers to host"
   (:require [decide-host.core :refer :all]
             [decide-host.database :as db]
+            [decide-host.notifications :refer [error-msg]]
             [com.keminglabs.zmq-async.core :refer [register-socket!]]
             [clojure.core.async :as async :refer [>! <! >!! <!!]]
             [clojure.core.match :refer [match]]
@@ -46,13 +47,17 @@
                    :ok))))
 
 (defn disconnect!
-  [context sock-id & flags]
+  "Removes the controller associated with sock-id from the database. Options:
+
+  :err - if not nil, notifes the admins and any users associated with the subject"
+  [context sock-id & {err :err}]
   (let [{{db :db} :database} context
-        flags (set flags)
-        err (:err flags)]
-    (when-let [controller (db/find-controller-by-socket db sock-id)]
-      ;; TODO notify user if error
-      (println "I:" (:addr controller) "disconnected" (if err "unexpectedly" "")))
+        {addr :addr} (db/find-controller-by-socket db sock-id)]
+    (when addr
+      (if err
+        (let [subj (db/find-subject-by-addr db addr)]
+          (error-msg context (str addr " disconnected unexpectedly") (:user subj)))
+        (println "I:" addr "disconnected")))
     (db/remove-controller! db sock-id)) nil)
 
 (defn store-data!
@@ -117,7 +122,10 @@
         interval (t/in-millis (t/interval last-seen (t/now)))]
     #_(println "D:" addr "last seen" interval "ms ago")
     (cond
-      (not (pos? alive)) (disconnect! context zmq-id :err)
+      (not (pos? alive))
+      (do
+        #_(println "D: lost heartbeat for " addr)
+        (disconnect! context zmq-id :err true))
       (> interval heartbeat)
       (do
         (db/dec-alive! db zmq-id)
