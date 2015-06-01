@@ -51,7 +51,9 @@
 (defn controller-list-view
   "Returns a list of all controllers in the database"
   [db params]
-  (map #(select-keys % [:addr :last-seen]) (db/find-controllers db params)))
+  (map (fn [c] (assoc (select-keys c [:addr :last-seen])
+                     :connected (not (nil? (:zmq-id c)))))
+       (db/find-controllers db params)))
 
 (defn controller-view
   [db addr]

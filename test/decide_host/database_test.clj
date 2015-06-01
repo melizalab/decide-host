@@ -42,7 +42,8 @@
         (add-controller! db sock-id addr)
         (find-controller-by-addr db addr) => (contains {:zmq-id sock-id :addr addr})
         (find-controller-by-socket db sock-id) => (contains {:zmq-id sock-id :addr addr})
-        (count (find-controllers db)) => 1)
+        (count (find-controllers db)) => 1
+        (count (find-connected-controllers db)) => 1)
     (fact "about subject state management"
         (fact "bad values return nil"
               (find-subject db nil) => nil

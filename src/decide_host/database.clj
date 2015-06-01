@@ -56,17 +56,18 @@
 (defn add-controller!
   [db sock-id addr]
   (mc/update db ctrl-coll
-             {:zmq-id sock-id}
+             {:addr addr}
              {:addr addr :zmq-id sock-id}
              {:upsert true}))
+
+(defn update-controller!
+  "Updates database entry for controller"
+  [db sock-id kv] (mc/update db ctrl-coll {:zmq-id sock-id} {$set kv}))
 
 (defn remove-controller!
   "Removes controller from database"
   [db sock-id] (mc/remove db ctrl-coll {:zmq-id sock-id}))
 
-(defn update-controller!
-  "Updates database entry for controller"
-  [db sock-id kv] (mc/update db ctrl-coll {:zmq-id sock-id} {$set kv}))
 
 (defn set-alive!
   "Sets aliveness for controller entry"
@@ -125,6 +126,9 @@
 
 (defn find-controllers [db & [{:as query}]]
   (mc/find-maps db ctrl-coll query))
+
+(defn find-connected-controllers [db]
+  (mc/find-maps db ctrl-coll {:zmq-id {$ne nil}}))
 
 ;; subjects
 (defn find-subject [db subject]

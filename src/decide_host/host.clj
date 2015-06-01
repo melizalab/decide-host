@@ -38,10 +38,11 @@
            ;; another OHAI from existing client - noop
            [(_ :guard pos?) sock-id] :ok
            ;; socket does not match controller
-           [(_ :guard pos?) wrong-id] :wtf
+           [(_ :guard pos?) (wrong-id :guard (complement nil?))] :wtf
            ;; otherwise, add or update existing record
            :else (do
                    (println "I:" ctrl-addr "connected")
+                   (db/remove-controller! db sock-id)
                    (db/add-controller! db sock-id ctrl-addr)
                    (set-alive! context sock-id)
                    :ok))))
@@ -58,7 +59,7 @@
         (let [subj (db/find-subject-by-addr db addr)]
           (error-msg context (str addr " disconnected unexpectedly") (:user subj)))
         (println "I:" addr "disconnected")))
-    (db/remove-controller! db sock-id)) nil)
+    (db/update-controller! db sock-id {:zmq-id nil})) nil)
 
 (defn store-data!
   "Stores PUB data in the database. Returns :ack on success, :dup for duplicate
@@ -156,7 +157,7 @@
       (loop []
         (let [[x _] (async/alts! [ctrl-chan (async/timeout interval)])]
           (when (not= x :stop)
-            (dorun (map check-connection! (repeat context) (db/find-controllers db)))
+            (dorun (map #(check-connection! context %) (db/find-connected-controllers db)))
             (recur))))
       #_(println "D: heartbeat handler stopping"))
     {:ctrl ctrl-chan}))

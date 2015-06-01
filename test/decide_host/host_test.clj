@@ -27,7 +27,7 @@
     (assoc ctx :database (db/connect! (get-in ctx [:database :uri])))))
 
 (defn count-controllers [context]
-  (count (db/find-controllers (get-in context [:database :db]))))
+  (count (db/find-connected-controllers (get-in context [:database :db]))))
 (defn reset-database [context]
   (mg/drop-db (get-in context [:database :conn]) test-db))
 

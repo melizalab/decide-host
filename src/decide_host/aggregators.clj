@@ -36,8 +36,8 @@
 
 (defn join-controller
   [db {a :controller :as subj}]
-  (let [ctrl (db/find-controller-by-addr db a {:_id 0})]
-    (if (:alive ctrl)
+  (let [ctrl (db/find-controller-by-addr db a {:alive 1 :addr 1 :last-seen 1 :zmq-id 1})]
+    (if (and (:alive ctrl) (:zmq-id ctrl))
       (assoc subj :controller (select-keys ctrl [:addr :last-seen]))
       subj)))
 
