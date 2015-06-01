@@ -18,3 +18,5 @@ This document specifies the API of the *decide-host* operant control software fo
 - /subjects/:uuid/statistics : list of summary statistics (by hour?)
 
 All calls that return lists should support query parameters to filter results.
+
+Times are serialized as ISO strings.

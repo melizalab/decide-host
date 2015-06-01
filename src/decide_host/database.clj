@@ -28,6 +28,22 @@
       (merge-in (dissoc params key) {:time {op (tc/from-long (Long. time))}})
       (catch NumberFormatException e params))))
 
+(defn to-$in
+  [x]
+  (if (sequential? x) {$in x} x))
+
+(defn parse-array-constraints
+  "Replaces array parameters with $in expressions"
+  [params]
+  (into {} (map (fn [[k v]] [k (to-$in v)]) params)))
+
+(defn parse-constraints
+  [params]
+  (-> params
+      (parse-time-constraint :before)
+      (parse-time-constraint :after)
+      (parse-array-constraints)))
+
 (defn- find-and-sort
   [db coll query sort]
   (map from-db-object

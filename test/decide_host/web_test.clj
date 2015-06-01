@@ -41,6 +41,7 @@
       (let [uri (str "/controllers/" addr "/events")]
         (count (req app :get uri)) => 3
         (count (req app :get (str uri "?name=experiment"))) => 1
+        (count (req app :get (str uri "?name=experiment&name=cue_right_blue"))) => 2
         (count (req app :get (str uri "?before=" (tc/to-long this-hour)))) => 1
         ))
   (fact "trials"

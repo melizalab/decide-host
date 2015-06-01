@@ -68,9 +68,7 @@
 
 (defn event-view
   [db params]
-  (let [params (-> params
-                   (db/parse-time-constraint :before)
-                   (db/parse-time-constraint :after))]
+  (let [params (db/parse-constraints params)]
     (println "D: event-view" params)
     (db/find-events db params)))
 
@@ -78,16 +76,13 @@
   [db params]
   (let [params (-> params
                    (parse-comment-constraint)
-                   (db/parse-time-constraint :before)
-                   (db/parse-time-constraint :after))]
+                   (db/parse-constraints))]
     (println "D: trial-view" params)
     (db/find-trials db params)))
 
 (defn stats-view
   [db params]
-  (let [params (-> params
-                   (db/parse-time-constraint :before)
-                   (db/parse-time-constraint :after))]
+  (let [params (db/parse-constraints params)]
     (println "D: stats-view" params)
     (agg/hourly-stats db params)))
 
