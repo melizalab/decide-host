@@ -15,7 +15,9 @@ This document specifies the API of the *decide-host* operant control software fo
 - /subjects/active : list of all active subjects
 - /subjects/:uuid : specific subject (summary)
 - /subjects/:uuid/trials : list of trials for specific subject
-- /subjects/:uuid/statistics : list of summary statistics (by hour?)
+- /subjects/:uuid/stats : list of summary statistics by hour
+- /subjects/:uuid/stats/today : summary stats for current day
+- /subjects/:uuid/stats/last-hour : summary stats for last hour
 
 All calls that return lists should support query parameters to filter results.
 

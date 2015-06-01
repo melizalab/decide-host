@@ -23,6 +23,7 @@
   "Converts s to UUID type if possible. Otherwise returns the original argument"
   [s]
   (try (UUID/fromString s)
+       (catch ClassCastException e s)
        (catch IllegalArgumentException e s)
        (catch NullPointerException e s)))
 

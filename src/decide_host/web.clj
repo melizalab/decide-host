@@ -57,16 +57,18 @@
 
 (defn controller-view
   [db addr]
-  {:body (first (controller-list-view db {:addr addr}))})
+  (when-let [result (first (controller-list-view db {:addr addr}))]
+    {:body result}))
 
 (defn subject-list-view
   [db params]
   (println "D: subject-list-view" params)
-  (map (partial agg/join-all db) (db/find-subjects db params)))
+  (db/find-subjects db params))
 
 (defn subject-view
   [db subject]
-  {:body (agg/join-all db (db/find-subject db subject))})
+  (when-let [result (db/find-subject db subject)]
+    {:body result}))
 
 (defn event-view
   [db params]
@@ -94,17 +96,20 @@
      (GET "/" [] (-> (front-page) (response) (content-type "text/html")))
      (context "/controllers" [:as {params :params}]
        (GET "/" [] (controller-list-view db params))
-       (context "/:addr" [addr]
+       (context "/:addr" [addr :as {params :params}]
          (GET "/" [] (controller-view db addr))
          (GET "/events" [] (event-view db params))))
      (context "/subjects" [:as {params :params}]
        (GET "/" [] (subject-list-view db params))
        (GET "/active" [] (subject-list-view db (merge params {:controller {"$ne" nil}})))
        (GET "/inactive" [] (subject-list-view db (merge params {:controller nil})))
-       (context "/:subject" [subject]
+       (context "/:subject" [subject :as {params :params}]
          (GET "/" [] (subject-view db subject))
          (GET "/trials" [] (trial-view db params))
-         (GET "/stats" [] (stats-view db params))))
+         (context "/stats" []
+           (GET "/" [] (stats-view db params))
+           (GET "/today" [] {:body (agg/activity-stats-today db subject)})
+           (GET "/last-hour" [] {:body (agg/activity-stats-last-hour db subject)}))))
      (resources "/"))))
 
 (def app

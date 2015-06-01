@@ -1,6 +1,6 @@
 (ns decide-host.aggregators
   "Functions that make calculations on aggregate data"
-  (:require [decide-host.core :refer [merge-in convert-subject-uuid]]
+  (:require [decide-host.core :refer [merge-in convert-subject-uuid uuid]]
             [decide-host.database :as db :refer [trial-coll event-coll]]
             [monger.collection :as mc]
             [monger.operators :refer :all]
@@ -19,20 +19,23 @@
   (merge-in base (apply hash-map restrict)))
 
 ;; it might be more useful to calculate the total amount of time the hopper has
-;; been up, but that's fairly difficult to do
-(defn join-activity
-  "Calculates statistics for :subject in map and adds result to map
-  under :today. Result is nil if no trials found for subject."
-  [db since key map]
-  (let [{subj :_id :as result} map
-        match {:time {$gte since} :comment nil :subject subj}
-        [a] (mc/aggregate db trial-coll
-                       [{$match match}
-                        {$project trial-projection}
-                        {$group trial-grouping}])]
-    (if a
-      (assoc result key (select-keys a [:feed-ops :correct :trials]))
-      result)))
+;; been up, but that's fairly difficult to do with a simple database query
+(defn activity-stats
+  "Returns map of activity statistics for subject from since until now. Result
+  is nil if no trials found for subject."
+  [db subject since]
+  (let [match {:time {$gte since} :comment nil :subject (uuid subject)}
+        [result] (mc/aggregate db trial-coll
+                                [{$match match}
+                                 {$project trial-projection}
+                                 {$group trial-grouping}])]
+    (if result
+      (dissoc result :_id)
+      (into {} (for [k (keys (dissoc trial-grouping :_id))] [k 0])))))
+
+(defn activity-stats-today [db subject] (activity-stats db subject (t/today)))
+(defn activity-stats-last-hour [db subject]
+  (activity-stats db subject (t/minus (t/now) (t/hours 1))))
 
 (defn join-controller
   [db {a :controller :as subj}]
@@ -40,13 +43,6 @@
     (if (and (:alive ctrl) (:zmq-id ctrl))
       (assoc subj :controller (select-keys ctrl [:addr :last-seen]))
       subj)))
-
-(defn join-all
-  [db subject]
-  (->> subject
-       (join-controller db)
-       (join-activity db (t/today) :today)
-       (join-activity db (t/minus (t/now) (t/hours 1)) :last-hour)))
 
 (defn- convert-time
   [{time :_id :as rec}]

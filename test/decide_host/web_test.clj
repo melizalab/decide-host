@@ -28,7 +28,8 @@
       (req app :get (str "/controllers/" addr)) =>
       (contains (select-keys controller [:addr]))
 
-      (req app :get (str "/controllers/gar")) => nil)
+      (req app :get (str "/controllers/nobody")) => nil
+      (req app :get (str "/controllers/nobody/events")) => empty?)
   (fact "subjects"
       (count (req app :get "/subjects")) => 1
       (count (req app :get "/subjects/active")) => 1
@@ -36,7 +37,9 @@
       (count (req app :get (str "/subjects?controller=" (:controller subject)))) => 1
       (count (req app :get "/subjects?controller=xyzzy")) => 0
       (req app :get (str "/subjects/" subj-id)) => (contains {:_id subj-uuid})
-      (req app :get (str "/subjects/gar")) => nil)
+      (req app :get (str "/subjects/nobody")) => nil
+      (req app :get (str "/subjects/nobody/trials")) => empty?
+      (req app :get (str "/subjects/nobody/stats")) => empty?)
   (fact "events"
       (let [uri (str "/controllers/" addr "/events")]
         (count (req app :get uri)) => 3
