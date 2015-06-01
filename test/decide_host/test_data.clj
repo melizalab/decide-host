@@ -62,7 +62,7 @@
                  {:response "peck_right",
                   :category "S+",
                   :name "gng",
-                  :time (t/plus midnight (t/hours 1))
+                  :time (t/minus this-hour (t/hours 2))
                   :addr "pica",
                   :correction 0,
                   :experiment "gng-example",
@@ -73,6 +73,12 @@
                   :rtime 817852,
                   :subject subj-uuid,
                   :correct true}
+                 {:usec 217,
+                  :addr "pica",
+                  :name "gng",
+                  :time (t/minus this-hour (t/minutes 10))
+                  :subject subj-uuid
+                  :comment "heartbeat"}
                  {:response "peck_right",
                   :category "S-",
                   :name "gng",

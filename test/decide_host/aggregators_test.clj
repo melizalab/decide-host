@@ -25,10 +25,13 @@
       (join-all db {}) => {})
   (fact "hourly-stats summarizes correctly"
       (let [stats (hourly-stats db {:subject subj-id})]
-        (count stats) => 2
+        (count stats) => 3
         (first stats) => (contains {:trials 1
                                     :correct 1
                                     :feed-ops 1})
-        (second stats) => (contains {:trials 4
-                                    :correct 2
-                                    :feed-ops 1}))))
+        (second stats) => (contains {:trials 0
+                                    :correct 0
+                                     :feed-ops 0})
+        (second (rest stats)) => (contains {:trials 4
+                                            :correct 2
+                                            :feed-ops 1}))))

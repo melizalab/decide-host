@@ -50,12 +50,12 @@
   (fact "trials"
       (let [uri (str "/subjects/" subj-id "/trials")]
         (count (req app :get uri)) => 5
-        (count (req app :get (str uri "?comment=true"))) => 6
+        (count (req app :get (str uri "?comment=true"))) => 7
         (count (req app :get (str uri "?comment=starting"))) => 1
         (count (req app :get (str uri "?after=" (tc/to-long this-hour)))) => 4
         (count (req app :get (str uri "?before=" (tc/to-long this-hour)))) => 1))
   (fact "stats"
       (let [uri (str "/subjects/" subj-id "/stats")]
-        (count (req app :get uri)) => 2
+        (count (req app :get uri)) => 3
         (count (req app :get (str uri "?after=" (tc/to-long this-hour)))) => 1
-        (count (req app :get (str uri "?before=" (tc/to-long this-hour)))) => 1)))
+        (count (req app :get (str uri "?before=" (tc/to-long this-hour)))) => 2)))

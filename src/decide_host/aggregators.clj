@@ -8,12 +8,13 @@
 
 (def trial-projection {:time 1
                        :fed {$cond [{"$eq" ["$result" "feed"]} 1 0]}
-                       :correct {$cond ["$correct" 1 0]}})
+                       :correct {$cond ["$correct" 1 0]}
+                       :is-trial {$cond [{"$gte" ["$trial" 0]} 1 0]}})
 
 (def trial-grouping {:_id nil
                      :feed-ops {$sum "$fed"}
                      :correct {$sum "$correct"}
-                     :trials {$sum 1}})
+                     :trials {$sum "$is-trial"}})
 
 (defn merge-query [base restrict]
   (merge-in base (apply hash-map restrict)))
@@ -53,7 +54,8 @@
 
 (defn hourly-stats
   [db constraints]
-  (let [constraints (merge {:comment nil} (convert-subject-uuid constraints))
+  (let [constraints (merge {:comment {$in [nil "heartbeat"]}}
+                           (convert-subject-uuid constraints))
         a (mc/aggregate db trial-coll
                       [{$match constraints}
                        {$project trial-projection}
