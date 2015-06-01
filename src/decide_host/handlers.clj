@@ -27,8 +27,12 @@
            [{:topic :state-changed :name "experiment"
              :subject s :procedure p :user u :time t :addr a}]
            (if-not (nil? s)
-             (db/start-subject! db s {:procedure p :controller a :user u :start-time t})
-             (db/stop-subject! db a t))
+               (do
+                 (println "I:" a "started running" p)
+                 (db/start-subject! db s {:procedure p :controller a :user u :start-time t}))
+               (do
+                 (println "I:" a "stopped running a procedure")
+                 (db/stop-subject! db a t)))
 
            [{:topic :state-changed :name "hopper" :up state :addr a :time t}]
            (when state

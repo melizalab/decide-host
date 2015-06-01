@@ -101,7 +101,7 @@
        (GET "/" [] (subject-list-view db params))
        (GET "/active" [] (subject-list-view db (merge params {:controller {"$ne" nil}})))
        (GET "/inactive" [] (subject-list-view db (merge params {:controller nil})))
-       (context "/:subject" [subject ]
+       (context "/:subject" [subject]
          (GET "/" [] (subject-view db subject))
          (GET "/trials" [] (trial-view db params))
          (GET "/stats" [] (stats-view db params))))
