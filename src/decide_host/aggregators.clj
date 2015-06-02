@@ -52,7 +52,7 @@
         (dissoc :_id)
         (assoc :time tt))))
 
-#_(defn hourly-stats
+(defn hourly-stats
   [db constraints]
   (let [constraints (merge {:comment {$in [nil "heartbeat"]}}
                            (convert-subject-uuid constraints))

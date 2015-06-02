@@ -23,7 +23,7 @@
   #_(fact "join-all gives nils for missing subjects"
       (join-all db {:_id "doofus"}) => (just {:_id "doofus"})
       (join-all db {}) => {})
-  #_(fact "hourly-stats summarizes correctly"
+  (fact "hourly-stats summarizes correctly"
       (let [stats (hourly-stats db {:subject subj-id})]
         (count stats) => 3
         (first stats) => (contains {:trials 1
