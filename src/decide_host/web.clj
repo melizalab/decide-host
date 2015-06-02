@@ -7,7 +7,7 @@
                                                      wrap-json-response]]
             [ring.middleware.cors :refer [wrap-cors]]
             [compojure.core :refer [routes context GET]]
-            [compojure.route :refer [resources]]
+            [compojure.route :refer [resources not-found]]
             [hiccup.page :refer [html5 include-css include-js]]
             [decide-host.config :refer [init-context]]
             [decide-host.core :refer [merge-in]]
@@ -84,12 +84,6 @@
     (println "D: trial-view" params)
     (db/find-trials db params)))
 
-(defn stats-view
-  [db params]
-  (let [params (db/parse-constraints params)]
-    (println "D: stats-view" params)
-    (agg/hourly-stats db params)))
-
 (defn api-routes [ctx]
   (let [{{db :db} :database} ctx]
     (routes
@@ -107,10 +101,10 @@
          (GET "/" [] (subject-view db subject))
          (GET "/trials" [] (trial-view db params))
          (context "/stats" []
-           (GET "/" [] (stats-view db params))
            (GET "/today" [] {:body (agg/activity-stats-today db subject)})
            (GET "/last-hour" [] {:body (agg/activity-stats-last-hour db subject)}))))
-     (resources "/"))))
+     (resources "/")
+     (not-found {:status 404}))))
 
 (def app
   (reify App

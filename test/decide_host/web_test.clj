@@ -9,7 +9,10 @@
 
 (defn req
   [app method uri]
-  (:body (app (mock/request method uri))))
+  (let [result (app (mock/request method uri))]
+    (if (= (:status result) 200)
+      (:body result)
+      result)))
 
 (defn body=?
   [body]
@@ -28,7 +31,7 @@
       (req app :get (str "/controllers/" addr)) =>
       (contains (select-keys controller [:addr]))
 
-      (req app :get (str "/controllers/nobody")) => nil
+      (req app :get (str "/controllers/nobody")) => (contains {:status 404})
       (req app :get (str "/controllers/nobody/events")) => empty?)
   (fact "subjects"
       (count (req app :get "/subjects")) => 1
@@ -37,9 +40,8 @@
       (count (req app :get (str "/subjects?controller=" (:controller subject)))) => 1
       (count (req app :get "/subjects?controller=xyzzy")) => 0
       (req app :get (str "/subjects/" subj-id)) => (contains {:_id subj-uuid})
-      (req app :get (str "/subjects/nobody")) => nil
-      (req app :get (str "/subjects/nobody/trials")) => empty?
-      (req app :get (str "/subjects/nobody/stats")) => empty?)
+      (req app :get (str "/subjects/nobody")) => (contains {:status 404})
+      (req app :get (str "/subjects/nobody/trials")) => empty?)
   (fact "events"
       (let [uri (str "/controllers/" addr "/events")]
         (count (req app :get uri)) => 3
@@ -56,6 +58,6 @@
         (count (req app :get (str uri "?before=" (tc/to-long this-hour)))) => 1))
   (fact "stats"
       (let [uri (str "/subjects/" subj-id "/stats")]
-        (count (req app :get uri)) => 3
-        (count (req app :get (str uri "?after=" (tc/to-long this-hour)))) => 1
-        (count (req app :get (str uri "?before=" (tc/to-long this-hour)))) => 2)))
+        (req app :get (str uri "/today")) => (contains {:correct 3, :feed-ops 2, :trials 5})
+        (req app :get (str uri "/last-hour")) =not=> nil
+        (req app :get (str uri "/no-such-thing")) => (contains {:status 404}))))
