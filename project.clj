@@ -20,7 +20,6 @@
                  [com.novemberain/monger "2.0.0"]
                  [com.keminglabs/zmq-async "0.1.0"]
                  [com.draines/postal "1.11.3"]
-                 [digest "1.4.4"]
                  [cheshire "5.4.0"]
                  [clj-time "0.8.0"]]
 
@@ -32,5 +31,4 @@
   :profiles {:uberjar {:aot :all}
              :dev {:source-paths ["dev"]
                    :dependencies [[midje "1.5.1"]
-                                  [javax.servlet/servlet-api "2.5"]
                                   [ring-mock "0.1.5"]]}})
