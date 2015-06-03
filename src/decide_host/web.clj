@@ -27,7 +27,7 @@
 (defn controller-list-view
   "Returns a list of all controllers in the database"
   [db params]
-  (map (fn [c] (assoc (select-keys c [:addr :last-seen])
+  (map (fn [c] (assoc (select-keys c [:addr :last-seen :last-event])
                      :connected (not (nil? (:zmq-id c)))))
        (db/find-controllers db params)))
 
@@ -36,10 +36,12 @@
   (when-let [result (first (controller-list-view db {:addr addr}))]
     {:body result}))
 
-(defn subject-list-view
+(defn subjects-view
   [db params]
-  (println "D: subject-list-view" params)
+  (println "D: subjects-view" params)
   (db/find-subjects db params))
+(defn active-subjects-view [db] (subjects-view db {:controller {"$ne" nil}}))
+(defn inactive-subjects-view [db] (subjects-view db {:controller nil}))
 
 (defn subject-view
   [db subject]
@@ -66,20 +68,28 @@
     (println "D: stats-view" params)
     (agg/hourly-stats db params)))
 
+(defn front-page-view
+  [db]
+  (let [active-subjects (active-subjects-view db)]
+    (-> (view/index {:controllers (db/find-connected-controllers db)
+                     :inactive-subjects (inactive-subjects-view db)
+                     :active-subjects (map #(agg/join-activity db %) active-subjects)})
+        (response)
+        (content-type "text/html"))))
 
 (defn api-routes [ctx]
   (let [{{db :db} :database} ctx]
     (routes
-     #_(GET "/" [] (-> (front-page) (response) (content-type "text/html")))
+     (GET "/" [] (front-page-view db))
      (context "/controllers" [:as {params :params}]
        (GET "/" [] (controller-list-view db params))
        (context "/:addr" [addr :as {params :params}]
          (GET "/" [] (controller-view db addr))
          (GET "/events" [] (event-view db params))))
      (context "/subjects" [:as {params :params}]
-       (GET "/" [] (subject-list-view db params))
-       (GET "/active" [] (subject-list-view db (merge params {:controller {"$ne" nil}})))
-       (GET "/inactive" [] (subject-list-view db (merge params {:controller nil})))
+       (GET "/" [] (subjects-view db params))
+       (GET "/active" [] (active-subjects-view db))
+       (GET "/inactive" [] (inactive-subjects-view db))
        (context "/:subject" [subject :as {params :params}]
          (GET "/" [] (subject-view db subject))
          (GET "/trials" [] (trial-view db params))

@@ -23,8 +23,8 @@
               :subject subject}]
     (facts "about update-subject"
        (fact "handles experiment state-changed updates"
-          (db/add-controller! db sock-id addr)
-         (db/update-controller! db sock-id {:alive 10})
+         (db/add-controller! db sock-id addr)
+         (db/set-alive! db sock-id 10)
          (db/get-procedure db subject) => nil
          (update-subject! context data)
          (db/get-procedure db subject) => procedure)

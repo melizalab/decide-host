@@ -62,12 +62,11 @@
 
 (defn update-controller!
   "Updates database entry for controller"
-  [db sock-id kv] (mc/update db ctrl-coll {:zmq-id sock-id} {$set kv}))
+  [db addr kv] (mc/update db ctrl-coll {:addr addr} {$set kv}))
 
 (defn remove-controller!
   "Removes controller from database"
   [db sock-id] (mc/remove db ctrl-coll {:zmq-id sock-id}))
-
 
 (defn set-alive!
   "Sets aliveness for controller entry"

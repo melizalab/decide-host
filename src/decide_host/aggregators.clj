@@ -45,6 +45,12 @@
       (assoc subj :controller (select-keys ctrl [:addr :last-seen]))
       subj)))
 
+(defn join-activity
+  [db {s :_id :as subj}]
+  (assoc subj
+         :today (activity-stats-today db s)
+         :last-hour (activity-stats-last-hour db s)))
+
 (defn- convert-time
   [{time :_id :as rec}]
   (let [tt (apply t/date-time ((juxt :year :month :day :hour) time))]

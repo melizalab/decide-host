@@ -1,5 +1,6 @@
 (ns decide-host.core
   "Core data functions used by decide-host"
+  (:require [clojure.string :refer [join]])
   (:import [org.bson.types ObjectId]
            [java.util UUID]))
 
@@ -10,6 +11,8 @@
 (defn bytes-to-hex [x] (when-not (nil? x) (apply str (map #(format "%02x" %) x))))
 
 (defn hex-to-bytes [^String x] (.toByteArray (BigInteger. x 16)))
+
+(defn print-kv [stats] (join ", " (for [[k v] stats] (str (name k) ": " v))))
 
 (defn object-id
   "Returns a new BSON ObjectID, either newly generated or from a string

@@ -68,9 +68,9 @@
     (fact "about integrated subject/controller state"
         (let [data {:controller addr :procedure "testing"}]
           (add-controller! db sock-id addr)
-          (update-controller! db sock-id {:alive INIT-ALIVE})
+          (set-alive! db sock-id INIT-ALIVE)
           (start-subject! db subject data)
           (get-procedure db subject) => (:procedure data)
           (get-procedure db "some-other-subject") => nil
-          (update-controller! db sock-id {:alive 0})
+          (set-alive! db sock-id {:alive 0})
           (get-procedure db subject) => nil))))

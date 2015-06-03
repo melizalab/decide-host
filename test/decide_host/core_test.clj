@@ -28,3 +28,11 @@
     (merge-in {:a 1} {}) => {:a 1}
     (merge-in {:a 1} {:b 2}) => {:a 1 :b 2}
     (merge-in {:a {:b 1}} {:a {:c 2}}) => {:a {:b 1 :c 2}})
+
+(fact "print-kv serializes maps and maplikes"
+    (print-kv nil) => ""
+    (print-kv {}) => ""
+    (print-kv {:a 1}) => "a: 1"
+    (print-kv {:stuff "and nonsense"}) => "stuff: and nonsense"
+    (print-kv {:a 1 :b 2}) => (some-checker "a: 1, b: 2" "b: 2, a: 1")
+    (print-kv [[:a 1] [:b 2]]) => "a: 1, b: 2")

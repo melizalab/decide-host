@@ -39,7 +39,7 @@
              (db/update-subject-by-controller! db a {:last-fed t}))
 
            [{:topic :state-changed :addr a :time t}]
-           (db/update-subject-by-controller! db a {:last-event t})
+           (db/update-controller! db a {:last-event t})
 
            [{:topic :trial-data :subject s :trial n :time t}]
            (db/update-subject! db s {:last-trial t})

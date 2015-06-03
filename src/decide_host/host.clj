@@ -59,7 +59,7 @@
         (let [subj (db/find-subject-by-addr db addr)]
           (error-msg context (str addr " disconnected unexpectedly") (:user subj)))
         (println "I:" addr "disconnected")))
-    (db/update-controller! db sock-id {:zmq-id nil})) nil)
+    (db/remove-controller! db sock-id)) nil)
 
 (defn store-data!
   "Stores PUB data in the database. Returns :ack on success, :dup for duplicate
