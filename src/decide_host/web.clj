@@ -20,7 +20,7 @@
   "If :comment is 'true', removes any filter for comments; otherwise "
   [params]
   (case (:comment params)
-    "true" (dissoc params :comment)
+    ("true" "True" true) (dissoc params :comment)
     nil (assoc params :comment nil)
     params))
 
@@ -112,7 +112,7 @@
            (GET "/today" [] {:body (agg/activity-stats-today db subject)})
            (GET "/last-hour" [] {:body (agg/activity-stats-last-hour db subject)}))))
      (resources "/")
-     (not-found {:status 404}))))
+     (not-found nil))))
 
 (def app
   (reify App
