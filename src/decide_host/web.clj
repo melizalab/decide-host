@@ -8,6 +8,7 @@
             [ring.middleware.cors :refer [wrap-cors]]
             [compojure.core :refer [routes context GET]]
             [compojure.route :refer [resources not-found]]
+            [org.httpkit.server :refer [with-channel on-close send!]]
             [decide-host.config :refer [init-context]]
             [decide-host.core :refer [merge-in]]
             [decide-host.host :as host]
@@ -68,13 +69,6 @@
     (println "D: stats-view" params)
     (agg/hourly-stats db params)))
 
-(defn front-page-view
-  [db]
-  (let [active-subjects (active-subjects-view db)]
-    (view/index {:controllers (db/find-connected-controllers db)
-                     :inactive-subjects (inactive-subjects-view db)
-                     :active-subjects (map #(agg/join-activity db %) active-subjects)})))
-
 (defn api-routes
   [{{db :db} :database}]
   (routes
@@ -97,18 +91,43 @@
            (GET "/last-hour" [] {:body (agg/activity-stats-last-hour db subject)}))))
      (not-found nil))))
 
+(defn front-page-view
+  [db]
+  (let [active-subjects (active-subjects-view db)]
+    (view/index {:controllers (db/find-connected-controllers db)
+                     :inactive-subjects (inactive-subjects-view db)
+                 :active-subjects (map #(agg/join-activity db %) active-subjects)})))
+
+(defn update-handler
+  [req clients]
+  (with-channel req chan
+    (swap! clients assoc chan req)
+    (println "D: http/ws connection from" (:remote-addr req))
+    (on-close chan (fn [status]
+                      (swap! clients dissoc chan)
+                      (println "D:" (:remote-addr req) "disconnected")))))
+
 (defn site-routes
-  [{{db :db} :database}]
+  [{{db :db} :database ws-clients :ws-clients}]
   (routes
    (GET "/" [] (front-page-view db))
+   (GET "/ws" req (update-handler req ws-clients))
    (resources "/")
    (not-found "No such page!")))
+
+(defn update-clients!
+  [context data]
+  (let [{clients :ws-clients} context
+        {topic :topic} data]
+    (doseq [client @clients]
+      (send! (key client) (name topic)))))
 
 (def app
   (reify App
     (start! [_]
       (let [ctx (host/start! (init-context))]
         (add-handler ctx update-subject! :state-changed :trial-data)
+        (add-handler ctx update-clients! :state-changed :trial-data :connect :disconnect)
         {:context ctx
          :frodo/handler
          (routes

@@ -62,4 +62,5 @@
        [:p.ahead "Active Subjects"]
        [:ul#active-subject-list.item-list (subject-list active-subjects)]
        [:p.ahead "Inactive Subjects"]
-       [:ul#inactive-subject-list.item-list (subject-list inactive-subjects)]]]]]))
+       [:ul#inactive-subject-list.item-list (subject-list inactive-subjects)]]]]
+    (include-js "/js/interface.js")]))

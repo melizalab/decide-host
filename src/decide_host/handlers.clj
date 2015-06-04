@@ -10,7 +10,7 @@
   (let [{{pub :event-pub} :msg-handler} context]
     (when-let [tops (seq topics)]
       (let [chan (async/chan)]
-        (dorun (map #(async/sub pub % chan) topics))
+        (doseq [topic topics] (async/sub pub topic chan))
         (async/go-loop [data (<! chan)]
           (when data
             (f context data)

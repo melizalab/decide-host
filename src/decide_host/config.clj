@@ -5,4 +5,5 @@
 (defconfig config (io/resource "config/nomad-config.edn"))
 
 (defn init-context []
-  (select-keys (config) [:database :host :email]))
+  (assoc (select-keys (config) [:database :host :email])
+         :ws-clients (atom {})))

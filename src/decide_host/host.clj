@@ -32,7 +32,7 @@
 (defn connect!
   "Registers a controller as connected. :ok if successful, :wtf if the address is taken"
   [context sock-id ctrl-addr]
-  (let [{{db :db} :database} context
+  (let [{{db :db} :database events :event-chan} context
         {:keys [alive zmq-id]} (db/find-controller-by-addr db ctrl-addr)]
     (match [(or alive 0) zmq-id]
            ;; another OHAI from existing client - noop
@@ -42,6 +42,7 @@
            ;; otherwise, add or update existing record
            :else (do
                    (println "I:" ctrl-addr "connected")
+                   (pub events :connect ctrl-addr)
                    (db/remove-controller! db sock-id)
                    (db/add-controller! db sock-id ctrl-addr)
                    (set-alive! context sock-id)
@@ -52,13 +53,14 @@
 
   :err - if not nil, notifes the admins and any users associated with the subject"
   [context sock-id & {err :err}]
-  (let [{{db :db} :database} context
+  (let [{{db :db} :database events :event-chan} context
         {addr :addr} (db/find-controller-by-socket db sock-id)]
     (when addr
       (if err
         (let [subj (db/find-subject-by-addr db addr)]
           (error-msg context (str addr " disconnected unexpectedly") (:user subj)))
-        (println "I:" addr "disconnected")))
+        (println "I:" addr "disconnected"))
+      (pub events :disconnect addr))
     (db/remove-controller! db sock-id)) nil)
 
 (defn store-data!
@@ -67,7 +69,7 @@
   invalid/unparseable data"
   [context id data-type data-id data]
   #_(println "D: storing data" id data-type data-id data)
-  (let [{{db :db} :database event-c :event-chan} context]
+  (let [{{db :db} :database events :event-chan} context]
     (set-alive! context id)
     (if-let [addr (:addr (db/find-controller-by-socket db id))]
       (if-let [data (decode-pub data)]
@@ -76,7 +78,7 @@
                           :addr addr
                           :time (tc/from-long (long (/ time 1000)))
                           :usec (mod time 1000))]
-          (pub event-c data-type data)
+          (pub events data-type data)
           (db/log-message! db data-type data-id data))
         :rtfm-fmt)
       :who?)))
