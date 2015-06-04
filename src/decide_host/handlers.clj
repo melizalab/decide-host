@@ -2,8 +2,7 @@
   "Functions that perform asynchronous, non-core responses to controller events"
   (:require [decide-host.database :as db]
             [clojure.core.async :as async :refer [>! <! >!! <!!]]
-            [clojure.core.match :refer [match]]
-            [clj-time.core :as t]))
+            [clojure.core.match :refer [match]]))
 
 (defn add-handler
   "Adds an asynchronous handler f to pub for one or more topics"

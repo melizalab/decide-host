@@ -2,15 +2,16 @@
   "HTML views"
   (:require [decide-host.core :refer [print-kv]]
             [clj-time.format :as tf]
+            [clj-time.core :as t]
             [hiccup.core :refer [html]]
             [hiccup.page :refer [html5 include-css include-js]]))
 
-(def ^:private time-formatter (tf/formatter "HH:mm:SS MM-dd-YYYY"))
+(def ^:private datetime-formatter (tf/formatter-local "hh:mm:ss aa zzz MM-dd-YYYY"))
 
 (defn mailto-link [user] [:a {:href (str "mailto:" user)} user])
 (defn controller-link [{addr :addr}] [:a {:href (str "/controllers/" addr "/device")} addr])
 (defn span-value [v] [:span.success (if (map? v) (print-kv v) v)])
-(defn span-time [t] [:span.success (tf/unparse time-formatter t)])
+(defn span-time [t] [:span.success (tf/unparse datetime-formatter t)])
 
 (defn controller-list [controllers]
   (for [c controllers]
@@ -53,9 +54,12 @@
      [:div {:data-role "header"}
       [:h3 "Starboard Directory"]]
      [:div#console
-      [:p.ahead "Registered Controllers"]
-      [:ul#controller-list.item-list (controller-list controllers)]
-      [:p.ahead "Active Subjects"]
-      [:ul#active-subject-list.item-list (subject-list active-subjects)]
-      [:p.ahead "Inactive Subjects"]
-      [:ul#inactive-subject-list.item-list (subject-list inactive-subjects)]]]]))
+      [:p (span-time (t/to-time-zone (t/now) (t/default-time-zone)))]
+      [:div#controllers
+       [:p.ahead "Registered Controllers"]
+       [:ul#controller-list.item-list (controller-list controllers)]]
+      [:div#subjects
+       [:p.ahead "Active Subjects"]
+       [:ul#active-subject-list.item-list (subject-list active-subjects)]
+       [:p.ahead "Inactive Subjects"]
+       [:ul#inactive-subject-list.item-list (subject-list inactive-subjects)]]]]]))

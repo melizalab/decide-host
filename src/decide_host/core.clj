@@ -7,11 +7,8 @@
 (def version (-> "project.clj" slurp read-string (nth 2)))
 
 (defn to-string [x] (when-not (nil? x) (String. x)))
-
 (defn bytes-to-hex [x] (when-not (nil? x) (apply str (map #(format "%02x" %) x))))
-
 (defn hex-to-bytes [^String x] (.toByteArray (BigInteger. x 16)))
-
 (defn print-kv [stats] (join ", " (for [[k v] stats] (str (name k) ": " v))))
 
 (defn object-id
