@@ -42,7 +42,7 @@
 
 (defn subjects-view
   [db params]
-  (println "D: subjects-view" params)
+  #_(println "D: subjects-view" params)
   (db/find-subjects db params))
 (defn active-subjects-view [db] (subjects-view db {:controller {"$ne" nil}}))
 (defn inactive-subjects-view [db] (subjects-view db {:controller nil}))
@@ -55,7 +55,7 @@
 (defn event-view
   [db params]
   (let [params (db/parse-constraints params)]
-    (println "D: event-view" params)
+    #_(println "D: event-view" params)
     (db/find-events db params)))
 
 (defn trial-view
@@ -63,13 +63,13 @@
   (let [params (-> params
                    (parse-comment-constraint)
                    (db/parse-constraints))]
-    (println "D: trial-view" params)
+    #_(println "D: trial-view" params)
     (db/find-trials db params)))
 
 (defn stats-view
   [db params]
   (let [params (db/parse-constraints params)]
-    (println "D: stats-view" params)
+    #_(println "D: stats-view" params)
     (agg/hourly-stats db params)))
 
 (defn api-routes
@@ -80,7 +80,9 @@
        (GET "/" [] (controller-list-view db params))
        (context "/:addr" [addr :as {params :params}]
          (GET "/" [] (controller-view db addr))
-         (GET "/events" [] (event-view db params))))
+         (GET "/events" [] (event-view db params))
+         (GET "/device" [] {:status 501
+                            :body "Configure proxy server to redirect to controller"})))
      (context "/subjects" [:as {params :params}]
        (GET "/" [] (subjects-view db params))
        (GET "/active" [] (active-subjects-view db))
@@ -101,32 +103,34 @@
      :inactive-subjects (inactive-subjects-view db)
      :active-subjects (map #(agg/join-activity db %) active-subjects)}))
 
+(defn encode-for-ws
+  [map]
+  (json/encode (for [[k v] map] [k (html v)])))
+
 (defn update-clients!
+  "Sends new HTML over websockets to update their DOMs. HTML is keyed by id."
   [context data]
+  #_(println "D: update-clients!" data)
   (let [{{db :db} :database clients :ws-clients} context
-        upd (match [data]
-                   ;; start/stop experiment
-                   [{:topic :state-changed :name "experiment" :subject s}] true
-                   ;; connect or disconnect
-                   [{:topic (:or :connect :disconnect)}] true
-                   ;; trial
-                   [{:topic :trial-data :trial n}] true
-                   ;; otherwise ignore
-                   :else nil)]
-    (when upd
-      (doseq [client @clients]
-        (send! (key client) (-> (front-page-data db)
-                                (views/console)
-                                (html)))))))
+        {:keys [topic addr name time trial]} data
+        cdata (cond
+                (and (= topic :state-changed) (not= name "experiment"))
+                {:#time (views/server-time)
+                 (str "#" addr) (views/controller {:addr addr
+                                                   :last-event time})}
+                :else
+                {:#console (views/console (front-page-data db))})]
+    (doseq [client @clients]
+        (send! (key client) (encode-for-ws cdata)))))
 
 (defn update-handler
   [req clients]
   (with-channel req chan
     (swap! clients assoc chan req)
-    (println "D: http/ws connection from" (:remote-addr req))
+    #_(println "D: http/ws connection from" (:remote-addr req))
     (on-close chan (fn [status]
                       (swap! clients dissoc chan)
-                      (println "D:" (:remote-addr req) "disconnected")))))
+                      #_(println "D:" (:remote-addr req) "disconnected")))))
 
 (defn site-routes
   [{{db :db} :database ws-clients :ws-clients}]

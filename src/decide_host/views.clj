@@ -9,21 +9,26 @@
 (def ^:private datetime-formatter (tf/formatter-local "hh:mm:ss aa zzz MM-dd-YYYY"))
 
 (defn mailto-link [user] [:a {:href (str "mailto:" user)} user])
-(defn controller-link [{addr :addr}] [:a {:href (str "/controllers/" addr "/device")} addr])
 (defn span-value [v] [:span.success (if (map? v) (print-kv v) v)])
-(defn span-time [t] [:span.success (tf/unparse datetime-formatter t)])
+(defn span-time [t] [:span.success (tf/unparse datetime-formatter
+                                               (t/to-time-zone t (t/default-time-zone)))])
+(defn server-time [] (list "server time: " (span-time (t/now))))
 
+(defn controller-link [{addr :addr}] [:a {:href (str "/api/controllers/" addr "/device")}
+                                      addr])
+(defn controller
+  [c]
+  #_(println "D: controller" c)
+  (list (controller-link c)
+        [:ul.property-list
+         (when-let [t (:last-event c)]
+           [:li "last event: " (span-time t)])]))
 (defn controller-list [controllers]
-  (for [c controllers]
-    [:li {:id c} (controller-link c)
-     [:ul.property-list
-      (when-let [t (:last-event c)]
-        [:li "last event: " (span-time t)])]]))
+  (for [c controllers] [:li {:id (:addr c)} (controller c)]))
 
 (defn subject
   [{s :_id a :controller p :procedure e :experiment u :user
     t :last-trial today :today last-hour :last-hour :as subj}]
-  (println "D: subject:" subj)
   [:li {:id s} s
    [:ul.property-list
     (when a [:li "controller: " (controller-link {:addr a})])
@@ -35,13 +40,12 @@
        [:li "today: " (span-value today)]
        [:li "last hour: " (span-value last-hour)]))
     [:li "last trial: " (span-time t)]]])
-
 (defn subject-list [subjs] (map subject subjs))
 
 (defn console
   [{:keys [controllers active-subjects inactive-subjects]}]
   (list
-   [:p#time (span-time (t/to-time-zone (t/now) (t/default-time-zone)))]
+   [:p#time (server-time)]
    [:div#controllers
     [:p.ahead "Registered Controllers"]
     [:ul#controller-list.item-list (controller-list controllers)]]
