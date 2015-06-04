@@ -71,16 +71,14 @@
 (defn front-page-view
   [db]
   (let [active-subjects (active-subjects-view db)]
-    (-> (view/index {:controllers (db/find-connected-controllers db)
+    (view/index {:controllers (db/find-connected-controllers db)
                      :inactive-subjects (inactive-subjects-view db)
-                     :active-subjects (map #(agg/join-activity db %) active-subjects)})
-        (response)
-        (content-type "text/html"))))
+                     :active-subjects (map #(agg/join-activity db %) active-subjects)})))
 
-(defn api-routes [ctx]
-  (let [{{db :db} :database} ctx]
-    (routes
-     (GET "/" [] (front-page-view db))
+(defn api-routes
+  [{{db :db} :database}]
+  (routes
+   (context "/api" []
      (context "/controllers" [:as {params :params}]
        (GET "/" [] (controller-list-view db params))
        (context "/:addr" [addr :as {params :params}]
@@ -97,8 +95,14 @@
            (GET "/" [] (stats-view db params))
            (GET "/today" [] {:body (agg/activity-stats-today db subject)})
            (GET "/last-hour" [] {:body (agg/activity-stats-last-hour db subject)}))))
-     (resources "/")
      (not-found nil))))
+
+(defn site-routes
+  [{{db :db} :database}]
+  (routes
+   (GET "/" [] (front-page-view db))
+   (resources "/")
+   (not-found "No such page!")))
 
 (def app
   (reify App
@@ -107,12 +111,14 @@
         (add-handler ctx update-subject! :state-changed :trial-data)
         {:context ctx
          :frodo/handler
-         (-> (api-routes ctx)
-             (wrap-defaults api-defaults)
-             (wrap-cors :access-control-allow-origin #".+"
-                        :access-control-allow-methods [:get])
-             (wrap-restful-response :formats [:json-kw :edn
-                                              :transit-json :transit-msgpack])
-             #_(wrap-json-response :pretty true))}))
+         (routes
+          (-> (api-routes ctx)
+              (wrap-defaults api-defaults)
+              (wrap-cors :access-control-allow-origin #".+"
+                         :access-control-allow-methods [:get])
+              (wrap-restful-response :formats [:json-kw :edn
+                                               :transit-json :transit-msgpack])
+              #_(wrap-json-response :pretty true))
+          (site-routes ctx))}))
     (stop! [_ system]
       (host/stop! (:context system)))))

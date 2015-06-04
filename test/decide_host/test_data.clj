@@ -1,9 +1,9 @@
 (ns decide-host.test-data
   (:require [decide-host.core :refer [uuid]]
+            [clj-time.core :as t]
             [decide-host.database :as db :refer [ctrl-coll subj-coll trial-coll event-coll]]
             [monger.core :as mg]
-            [monger.collection :as mc]
-            [clj-time.core :as t]))
+            [monger.collection :as mc]))
 
 (def test-db "decide-test")
 (def test-uri (str "mongodb://localhost/" test-db))
