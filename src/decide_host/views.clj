@@ -67,7 +67,7 @@
     [:link {:rel "icon" :type "image/ico" :href "/images/favicon.ico"}]
     (include-css "/css/jquery.mobile-1.3.1.min.css")
     (include-css "/css/directory.css")
-    (include-js "/js/jquery-1.9.1.min.js")
+    (include-js "/js/jquery-2.1.4.min.js")
     (include-js "/js/interface.js")]
    [:body
     [:div#page1 {:data-role "page"}

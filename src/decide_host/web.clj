@@ -37,7 +37,7 @@
 (defn subjects-view
   [db params]
   (let [params (query/parse params :actions [:sequences :uuid])]
-    (println "D: subjects-view" params)
+    #_(println "D: subjects-view" params)
     (db/find-subjects db (:match params))))
 (defn active-subjects-view [db] (subjects-view db {:controller {"$ne" nil}}))
 (defn inactive-subjects-view [db] (subjects-view db {:controller nil}))
@@ -50,19 +50,19 @@
 (defn event-view
   [db params]
   (let [params (query/parse params)]
-    (println "D: event-view" params)
+    #_(println "D: event-view" params)
     (db/find-events db params)))
 
 (defn trial-view
   [db params]
   (let [params (query/parse params)]
-    (println "D: trial-view" params)
+    #_(println "D: trial-view" params)
     (db/find-trials db params)))
 
 (defn stats-view
   [db params]
   (let [params (query/parse params)]
-    (println "D: stats-view" params)
+    #_(println "D: stats-view" params)
     (agg/hourly-stats db params)))
 
 (defn api-routes

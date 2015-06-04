@@ -10,9 +10,6 @@
             [clj-time.coerce :as tc]
             [cheshire.core :as json]))
 
-;; channel and publication used to distribute non-core processing of events
-;; note that events may get dropped on this channel
-
 (defn pub
   "Publishes an event to subscribers. Data should be a map"
   [chan topic data]
@@ -163,8 +160,6 @@
             (recur))))
       #_(println "D: heartbeat handler stopping"))
     {:ctrl ctrl-chan}))
-
-;;(add-handler h/update-subject! :state-changed :trial-data)
 
 (defn- start-zmq-server
   "Starts a server that will bind a zeromq socket to addr."

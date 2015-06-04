@@ -1,4 +1,5 @@
 (ns decide-host.query-test
+  (:refer-clojure :exclude [time sort-by])
   (:require [midje.sweet :refer :all]
             [decide-host.query :refer :all]
             [clj-time.coerce :as tc]
@@ -26,6 +27,10 @@
     (subject-uuid {:match {:a 1}}) => {:match {:a 1}}
     (subject-uuid {:match {:subject 1}}) => {:match {:subject 1}}
     (subject-uuid {:match {:subject subj-id}}) => {:match {:subject subj-uuid}})
+
+(fact "about sort-by"
+    (sort-by {:match {:a 1}}) => {:match {:a 1}}
+    (sort-by {:match {:a 1 :sort-a "1"}}) => {:match {:a 1} :sort {"a" 1}})
 
 (fact "about parse"
     (let [tt 1432753029026

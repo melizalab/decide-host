@@ -1,6 +1,6 @@
 (ns decide-host.query
   "Translating http query parameters to mongodb database queries"
-  (:refer-clojure :exclude [time])
+  (:refer-clojure :exclude [time sort-by])
   (:require [monger.operators :refer :all]
             [clojure.core.incubator :refer [dissoc-in]]
             [clj-time.coerce :as tc]
@@ -48,16 +48,27 @@
     (assoc query :match (dissoc m :limit) :limit (Long. limit))
     query))
 
-#_(defn sort-by
-  "Sort parameters should look like "
+(defn sort-by
+  "Sort parameters should look like :sort-field = 1,-1.
+  NB: Order of keys is undefined if query is a hash map"
   [{m :match s :sort :as query}]
-  (if-let [sort (:sort m)]))
+  (let [sort (into (array-map)
+                   (for [[k v] m
+                         :let [[_ f] (re-find #"^sort-(.+)" (name k))]
+                         :when f]
+                     [f (Integer. v)]))
+        sorted-keys (map #(keyword (str "sort-" %)) (keys sort))]
+    (if-not (empty? sort)
+      (assoc query :sort sort
+             :match (apply dissoc m sorted-keys))
+      query)))
 
 (def ^:private fmap {:before before-time
                      :after after-time
                      :comment comments
                      :limit-to limit-to
                      :uuid subject-uuid
+                     :sort sort-by
                      :sequences sequences})
 
 (defn parse
