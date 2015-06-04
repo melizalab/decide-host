@@ -22,11 +22,6 @@
   [body]
   (fn [x] (= (:body x) body)))
 
-(fact "about parse-comment-constraint"
-    (parse-comment-constraint {:a 1}) => {:a 1 :comment nil}
-    (parse-comment-constraint {:a 1 :comment "true"}) => {:a 1}
-    (parse-comment-constraint {:a 1 :comment "starting"}) => {:a 1 :comment "starting"})
-
 ;; most functionality is tested in unit tests; focus on query parameters here
 (let [db (setup-db)
       addr (:addr controller)

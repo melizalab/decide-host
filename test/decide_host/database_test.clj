@@ -13,18 +13,6 @@
 (def test-uri (str "mongodb://localhost/" test-db))
 (def INIT-ALIVE 5)
 
-(fact "about parse-time-constraint"
-    (parse-time-constraint {:a 1} :after) => {:a 1}
-    (parse-time-constraint {:a 1 :after "blarg"} :after) => {:a 1 :after "blarg"}
-    (let [tt 1432753029026
-          tp (tc/from-long tt)]
-      (parse-time-constraint {:a 1 :after (str tt)} :after) => {:a 1 :time {$gte tp}}
-      (parse-time-constraint {:a 1 :before (str tt)} :before) => {:a 1 :time {$lte tp}}))
-
-(fact "about parse-array-constraints"
-    (parse-array-constraints {:a 1}) => {:a 1}
-    (parse-array-constraints {:a [1 2]}) => (contains {:a {$in [1 2]}}))
-
 (fact "bad uris generate exceptions"
     (connect! "garbledegook") => (throws Exception)
     (connect! "mongodb://localhost:1234/decide-test") => (throws Exception))

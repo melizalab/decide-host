@@ -15,25 +15,19 @@
             [decide-host.config :refer [init-context]]
             [decide-host.core :refer [merge-in]]
             [decide-host.host :as host]
+            [decide-host.query :as query]
             [decide-host.database :as db]
             [decide-host.aggregators :as agg]
             [decide-host.views :as views]
             [decide-host.handlers :refer [add-handler update-subject!]]))
 
-(defn parse-comment-constraint
-  "If :comment is 'true', removes any filter for comments; otherwise "
-  [params]
-  (case (:comment params)
-    ("true" "True" true) (dissoc params :comment)
-    nil (assoc params :comment nil)
-    params))
-
 (defn controller-list-view
   "Returns a list of all controllers in the database"
   [db params]
-  (map (fn [c] (assoc (select-keys c [:addr :last-seen :last-event])
-                     :connected (not (nil? (:zmq-id c)))))
-       (db/find-controllers db params)))
+  (let [params (query/parse params :actions [:sequences])]
+    (map (fn [c] (assoc (select-keys c [:addr :last-seen :last-event])
+                       :connected (not (nil? (:zmq-id c)))))
+         (db/find-controllers db (:match params)))))
 
 (defn controller-view
   [db addr]
@@ -42,8 +36,9 @@
 
 (defn subjects-view
   [db params]
-  #_(println "D: subjects-view" params)
-  (db/find-subjects db params))
+  (let [params (query/parse params :actions [:sequences :uuid])]
+    (println "D: subjects-view" params)
+    (db/find-subjects db (:match params))))
 (defn active-subjects-view [db] (subjects-view db {:controller {"$ne" nil}}))
 (defn inactive-subjects-view [db] (subjects-view db {:controller nil}))
 
@@ -54,22 +49,20 @@
 
 (defn event-view
   [db params]
-  (let [params (db/parse-constraints params)]
-    #_(println "D: event-view" params)
+  (let [params (query/parse params)]
+    (println "D: event-view" params)
     (db/find-events db params)))
 
 (defn trial-view
   [db params]
-  (let [params (-> params
-                   (parse-comment-constraint)
-                   (db/parse-constraints))]
-    #_(println "D: trial-view" params)
+  (let [params (query/parse params)]
+    (println "D: trial-view" params)
     (db/find-trials db params)))
 
 (defn stats-view
   [db params]
-  (let [params (db/parse-constraints params)]
-    #_(println "D: stats-view" params)
+  (let [params (query/parse params)]
+    (println "D: stats-view" params)
     (agg/hourly-stats db params)))
 
 (defn api-routes
@@ -109,24 +102,24 @@
 
 (defn update-clients!
   "Sends new HTML over websockets to update their DOMs. HTML is keyed by id."
-  [context data]
+  [{{db :db} :database clients :ws-clients} data]
   #_(println "D: update-clients!" data)
-  (let [{{db :db} :database clients :ws-clients} context
-        {:keys [topic addr name time trial subject]} data
-        cdata (cond
-                (and (= topic :state-changed) (not= name "experiment"))
-                {:#time (views/server-time)
-                 (str "#" addr) (views/controller {:addr addr
-                                                   :last-event time})}
-                (and (= topic :trial-data) (not (nil? trial)))
-                (let [subj (assoc (agg/join-activity db (db/find-subject db subject))
-                                  :last-trial time)]
+  (when-let [clients (seq @clients)]
+    (let [{:keys [topic addr name time trial subject]} data
+          cdata (cond
+                  (and (= topic :state-changed) (not= name "experiment"))
                   {:#time (views/server-time)
-                   (str "#" subject) (views/subject subj)})
-                :else
-                {:#console (views/console (front-page-data db))})]
-    (doseq [client @clients]
-        (send! (key client) (encode-for-ws cdata)))))
+                   (str "#" addr) (views/controller {:addr addr
+                                                     :last-event time})}
+                  (and (= topic :trial-data) (not (nil? trial)))
+                  (let [subj (assoc (agg/join-activity db (db/find-subject db subject))
+                                    :last-trial time)]
+                    {:#time (views/server-time)
+                     (str "#" subject) (views/subject subj)})
+                  :else
+                  {:#console (views/console (front-page-data db))})]
+      (doseq [client clients]
+        (send! (key client) (encode-for-ws cdata))))))
 
 (defn update-handler
   [req clients]

@@ -3,53 +3,16 @@
             [monger.joda-time]
             [monger.core :as mg]
             [monger.collection :as mc]
-            [monger.conversion :refer [to-db-object from-db-object]]
-            [monger.result :refer [ok? updated-existing?]]
             [monger.operators :refer :all]
-            [clj-time.core :as t]
-            [clj-time.coerce :as tc]))
+            [monger.query :as q]
+            [monger.result :refer [ok? updated-existing?]]
+            [clj-time.core :as t]))
 
 ;; collection names
 (def event-coll "events")
 (def trial-coll "trials")
 (def subj-coll "subjects")
 (def ctrl-coll "controllers")
-
-(def ^:private time-keyops {:before $lte
-                            :after $gte})
-
-;;; data functions
-(defn parse-time-constraint
-  "Parses parameter to appropriate mongodb query operator."
-  [params key]
-  (let [op (key time-keyops)
-        time (key params)]
-    (try
-      (merge-in (dissoc params key) {:time {op (tc/from-long (Long. time))}})
-      (catch NumberFormatException e params))))
-
-(defn to-$in
-  [x]
-  (if (sequential? x) {$in x} x))
-
-(defn parse-array-constraints
-  "Replaces array parameters with $in expressions"
-  [params]
-  (into {} (map (fn [[k v]] [k (to-$in v)]) params)))
-
-(defn parse-constraints
-  [params]
-  (-> params
-      (parse-time-constraint :before)
-      (parse-time-constraint :after)
-      (parse-array-constraints)))
-
-(defn- find-and-sort
-  [db coll query sort]
-  (map from-db-object
-       (.sort (mc/find db coll query {:_id 0})
-              (to-db-object sort))
-       (repeat true)))
 
 ;;; database manipulation
 ;; controllers
@@ -106,11 +69,9 @@
                     "state-changed" event-coll
                     "trial-data" trial-coll
                     nil)]
-      (let [obj-id (object-id data-id)]
-        (if (updated-existing? (mc/update db coll
-                                          {:_id obj-id}
-                                          (convert-subject-uuid data)
-                                          {:upsert true}))
+    (let [obj-id (object-id data-id)
+          data (convert-subject-uuid data)]
+        (if (updated-existing? (mc/update db coll {:_id obj-id} data {:upsert true}))
           :dup :ack))
       :rtfm-dtype))
 
@@ -145,18 +106,20 @@
 (defn find-subjects
   "Gets subjects in database, limited by query"
   [db & [{:as query}]]
-  (mc/find-maps db subj-coll (convert-subject-uuid query)))
+  (mc/find-maps db subj-coll query))
 
 ;; trials and events
-(defn find-trials
-  [db & [{:as query}]]
-  (let [query (convert-subject-uuid query)]
-    (find-and-sort db trial-coll query {:time 1})))
-
-(defn find-events
-  [db & [{:as query}]]
-  (let [query (convert-subject-uuid query)]
-    (find-and-sort db event-coll query {:time 1})))
+(defn- find-generic
+  [db coll & [{:keys [match sort limit]
+               :or {sort {:time 1}
+                    limit 0}}]]
+  (q/with-collection db coll
+    (q/find match)
+    (q/fields {:_id 0})
+    (q/sort sort)
+    (q/limit limit)))
+(defn find-trials [db & [query]] (find-generic db trial-coll query))
+(defn find-events [db & [query]] (find-generic db event-coll query))
 
 ;;; convenience methods
 (defn connect!
