@@ -1,5 +1,5 @@
 (ns decide-host.notifications
-  (:require [postal.core :as post]))
+  (require [postal.core :as post]))
 
 (defn error-msg
   [{{admins :admins
