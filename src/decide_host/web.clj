@@ -1,20 +1,19 @@
 (ns decide-host.web
-  (:gen-class)
-  (:require [frodo.web :refer [App]]
-            [ring.util.response :refer [response content-type]]
-            [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
-            [ring.middleware.format-response :refer [wrap-restful-response
-                                                     wrap-json-response]]
-            [ring.middleware.cors :refer [wrap-cors]]
-            [compojure.core :refer [routes context GET]]
-            [compojure.route :refer [resources not-found]]
-            [decide-host.config :refer [init-context]]
-            [decide-host.core :refer [merge-in]]
-            [decide-host.host :as host]
-            [decide-host.database :as db]
+  (:require [compojure.core :refer [GET context routes]]
+            [compojure.route :refer [not-found resources]]
             [decide-host.aggregators :as agg]
+            [decide-host.config :refer [init-context]]
+            [decide-host.database :as db]
+            [decide-host.handlers :refer [add-handler update-subject!]]
+            [decide-host.host :as host]
             [decide-host.views :as view]
-            [decide-host.handlers :refer [add-handler update-subject!]]))
+            [frodo.web :refer [App]]
+            [ring.middleware.cors :refer [wrap-cors]]
+            [ring.middleware.defaults :refer [api-defaults
+                                              wrap-defaults]]
+            [ring.middleware.format-response :refer [wrap-restful-response]]
+            [ring.util.response :refer [content-type response]])
+  (:gen-class))
 
 (defn parse-comment-constraint
   "If :comment is 'true', removes any filter for comments; otherwise "

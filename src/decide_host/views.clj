@@ -1,10 +1,9 @@
 (ns decide-host.views
   "HTML views"
-  (:require [decide-host.core :refer [print-kv]]
+  (:require [clj-time.core :as t]
             [clj-time.format :as tf]
-            [clj-time.core :as t]
-            [hiccup.core :refer [html]]
-            [hiccup.page :refer [html5 include-css include-js]]))
+            [decide-host.core :refer [print-kv]]
+            [hiccup.page :refer [html5 include-css]]))
 
 (def ^:private datetime-formatter (tf/formatter-local "hh:mm:ss aa zzz MM-dd-YYYY"))
 

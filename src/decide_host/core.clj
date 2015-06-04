@@ -1,8 +1,8 @@
 (ns decide-host.core
   "Core data functions used by decide-host"
   (:require [clojure.string :refer [join]])
-  (:import [org.bson.types ObjectId]
-           [java.util UUID]))
+  (:import (java.util UUID)
+           (org.bson.types ObjectId)))
 
 (def version (-> "project.clj" slurp read-string (nth 2)))
 

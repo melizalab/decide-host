@@ -1,13 +1,12 @@
 (ns decide-host.database
-  (:require [decide-host.core :refer :all]
-            [monger.joda-time]
-            [monger.core :as mg]
-            [monger.collection :as mc]
-            [monger.conversion :refer [to-db-object from-db-object]]
-            [monger.result :refer [ok? updated-existing?]]
-            [monger.operators :refer :all]
+  (:require [clj-time.coerce :as tc]
             [clj-time.core :as t]
-            [clj-time.coerce :as tc]))
+            [decide-host.core :refer :all]
+            [monger.collection :as mc]
+            [monger.conversion :refer [from-db-object to-db-object]]
+            [monger.core :as mg]
+            [monger.operators :refer :all]
+            [monger.result :refer [updated-existing?]]))
 
 ;; collection names
 (def event-coll "events")

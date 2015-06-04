@@ -1,10 +1,11 @@
 (ns decide-host.aggregators
   "Functions that make calculations on aggregate data"
-  (:require [decide-host.core :refer [merge-in convert-subject-uuid uuid]]
-            [decide-host.database :as db :refer [trial-coll event-coll]]
+  (:require [clj-time.core :as t]
+            [decide-host.core :refer [convert-subject-uuid merge-in
+                                      uuid]]
+            [decide-host.database :as db :refer [trial-coll]]
             [monger.collection :as mc]
-            [monger.operators :refer :all]
-            [clj-time.core :as t]))
+            [monger.operators :refer :all]))
 
 (def trial-projection {:time 1
                        :fed {$cond [{"$eq" ["$result" "feed"]} 1 0]}
