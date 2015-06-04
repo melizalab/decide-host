@@ -112,12 +112,17 @@
   [context data]
   #_(println "D: update-clients!" data)
   (let [{{db :db} :database clients :ws-clients} context
-        {:keys [topic addr name time trial]} data
+        {:keys [topic addr name time trial subject]} data
         cdata (cond
                 (and (= topic :state-changed) (not= name "experiment"))
                 {:#time (views/server-time)
                  (str "#" addr) (views/controller {:addr addr
                                                    :last-event time})}
+                (and (= topic :trial-data) (not (nil? trial)))
+                (let [subj (assoc (agg/join-activity db (db/find-subject db subject))
+                                  :last-trial time)]
+                  {:#time (views/server-time)
+                   (str "#" subject) (views/subject subj)})
                 :else
                 {:#console (views/console (front-page-data db))})]
     (doseq [client @clients]
