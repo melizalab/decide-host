@@ -1,6 +1,8 @@
 (ns decide-host.web
   (:gen-class)
-  (:require [frodo.web :refer [App]]
+  (:require [clojure.core.match :refer [match]]
+            [cheshire.core :as json]
+            [frodo.web :refer [App]]
             [ring.util.response :refer [response content-type]]
             [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
             [ring.middleware.format-response :refer [wrap-restful-response
@@ -9,12 +11,13 @@
             [compojure.core :refer [routes context GET]]
             [compojure.route :refer [resources not-found]]
             [org.httpkit.server :refer [with-channel on-close send!]]
+            [hiccup.core :refer [html]]
             [decide-host.config :refer [init-context]]
             [decide-host.core :refer [merge-in]]
             [decide-host.host :as host]
             [decide-host.database :as db]
             [decide-host.aggregators :as agg]
-            [decide-host.views :as view]
+            [decide-host.views :as views]
             [decide-host.handlers :refer [add-handler update-subject!]]))
 
 (defn parse-comment-constraint
@@ -91,12 +94,30 @@
            (GET "/last-hour" [] {:body (agg/activity-stats-last-hour db subject)}))))
      (not-found nil))))
 
-(defn front-page-view
+(defn front-page-data
   [db]
   (let [active-subjects (active-subjects-view db)]
-    (view/index {:controllers (db/find-connected-controllers db)
-                     :inactive-subjects (inactive-subjects-view db)
-                 :active-subjects (map #(agg/join-activity db %) active-subjects)})))
+    {:controllers (db/find-connected-controllers db)
+     :inactive-subjects (inactive-subjects-view db)
+     :active-subjects (map #(agg/join-activity db %) active-subjects)}))
+
+(defn update-clients!
+  [context data]
+  (let [{{db :db} :database clients :ws-clients} context
+        upd (match [data]
+                   ;; start/stop experiment
+                   [{:topic :state-changed :name "experiment" :subject s}] true
+                   ;; connect or disconnect
+                   [{:topic (:or :connect :disconnect)}] true
+                   ;; trial
+                   [{:topic :trial-data :trial n}] true
+                   ;; otherwise ignore
+                   :else nil)]
+    (when upd
+      (doseq [client @clients]
+        (send! (key client) (-> (front-page-data db)
+                                (views/console)
+                                (html)))))))
 
 (defn update-handler
   [req clients]
@@ -110,17 +131,11 @@
 (defn site-routes
   [{{db :db} :database ws-clients :ws-clients}]
   (routes
-   (GET "/" [] (front-page-view db))
+   (GET "/" [] (views/index (front-page-data db)))
    (GET "/ws" req (update-handler req ws-clients))
    (resources "/")
    (not-found "No such page!")))
 
-(defn update-clients!
-  [context data]
-  (let [{clients :ws-clients} context
-        {topic :topic} data]
-    (doseq [client @clients]
-      (send! (key client) (name topic)))))
 
 (def app
   (reify App

@@ -15,7 +15,7 @@
 
 (defn controller-list [controllers]
   (for [c controllers]
-    [:li (controller-link c)
+    [:li {:id c} (controller-link c)
      [:ul.property-list
       (when-let [t (:last-event c)]
         [:li "last event: " (span-time t)])]]))
@@ -24,7 +24,7 @@
   [{s :_id a :controller p :procedure e :experiment u :user
     t :last-trial today :today last-hour :last-hour :as subj}]
   (println "D: subject:" subj)
-  [:li s
+  [:li {:id s} s
    [:ul.property-list
     (when a [:li "controller: " (controller-link {:addr a})])
     (when u [:li "user: " (mailto-link u)])
@@ -38,29 +38,35 @@
 
 (defn subject-list [subjs] (map subject subjs))
 
-(defn index [{:keys [controllers active-subjects inactive-subjects]}]
+(defn console
+  [{:keys [controllers active-subjects inactive-subjects]}]
+  (list
+   [:p#time (span-time (t/to-time-zone (t/now) (t/default-time-zone)))]
+   [:div#controllers
+    [:p.ahead "Registered Controllers"]
+    [:ul#controller-list.item-list (controller-list controllers)]]
+   [:div#subjects
+    [:p.ahead "Active Subjects"]
+    [:ul#active-subject-list.item-list (subject-list active-subjects)]
+    [:p.ahead "Inactive Subjects"]
+    [:ul#inactive-subject-list.item-list (subject-list inactive-subjects)]]))
+
+(defn index
+  [data]
   (html5
    [:head
     [:meta {:charset "utf-8"}]
     [:meta {:content "initial-scale=1.0, user-scalable=no", :name "viewport"}]
     [:meta {:content "yes", :name "apple-mobile-web-app-capable"}]
     [:meta {:content "black", :name "apple-mobile-web-app-status-bar-style"}]
-    [:title "Starboard Directory"]
+    [:title "Decide Directory"]
     [:link {:rel "icon" :type "image/ico" :href "/images/favicon.ico"}]
     (include-css "/css/jquery.mobile-1.3.1.min.css")
-    (include-css "/css/directory.css")]
+    (include-css "/css/directory.css")
+    (include-js "/js/jquery-1.9.1.min.js")
+    (include-js "/js/interface.js")]
    [:body
     [:div#page1 {:data-role "page"}
      [:div {:data-role "header"}
-      [:h3 "Starboard Directory"]]
-     [:div#console
-      [:p (span-time (t/to-time-zone (t/now) (t/default-time-zone)))]
-      [:div#controllers
-       [:p.ahead "Registered Controllers"]
-       [:ul#controller-list.item-list (controller-list controllers)]]
-      [:div#subjects
-       [:p.ahead "Active Subjects"]
-       [:ul#active-subject-list.item-list (subject-list active-subjects)]
-       [:p.ahead "Inactive Subjects"]
-       [:ul#inactive-subject-list.item-list (subject-list inactive-subjects)]]]]
-    (include-js "/js/interface.js")]))
+      [:h3 "Decide Directory"]]
+     [:div#console (console data)]]]))

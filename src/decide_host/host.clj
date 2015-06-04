@@ -42,7 +42,7 @@
            ;; otherwise, add or update existing record
            :else (do
                    (println "I:" ctrl-addr "connected")
-                   (pub events :connect ctrl-addr)
+                   (pub events :connect {:addr ctrl-addr})
                    (db/remove-controller! db sock-id)
                    (db/add-controller! db sock-id ctrl-addr)
                    (set-alive! context sock-id)
@@ -60,7 +60,7 @@
         (let [subj (db/find-subject-by-addr db addr)]
           (error-msg context (str addr " disconnected unexpectedly") (:user subj)))
         (println "I:" addr "disconnected"))
-      (pub events :disconnect addr))
+      (pub events :disconnect {:addr addr}))
     (db/remove-controller! db sock-id)) nil)
 
 (defn store-data!
