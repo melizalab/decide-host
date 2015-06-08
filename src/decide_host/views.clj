@@ -39,7 +39,8 @@
        [:li "experiment: " (span-value e)]
        [:li "today: " (span-value today)]
        [:li "last hour: " (span-value last-hour)]))
-    [:li "last trial: " (span-time t)]]])
+    (when t
+      [:li "last trial: " (span-time t)])]])
 (defn subject-list [subjs] (map subject subjs))
 
 (defn console

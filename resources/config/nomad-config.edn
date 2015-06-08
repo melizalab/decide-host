@@ -4,7 +4,7 @@
                   :web {:port 8020
                         :app decide-host.web/app}}
    :host {:protocol "decide-host@1"
-          :addr "tcp://127.0.0.1:5555"
+          :addr "tcp://*:5555"
           :heartbeat-ms 1000
           :heartbeat-init-alive 5}
    :database {:uri "mongodb://localhost:27017/decide"}

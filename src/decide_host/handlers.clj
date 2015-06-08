@@ -30,7 +30,7 @@
                  (println "I:" a "started running" p)
                  (db/start-subject! db s {:procedure p :controller a :user u :start-time t}))
                (do
-                 (println "I:" a "stopped running a procedure")
+                 (println "I:" a "is not running a procedure")
                  (db/stop-subject! db a t)))
 
            [{:topic :state-changed :name "hopper" :up state :addr a :time t}]
