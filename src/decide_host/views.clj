@@ -14,11 +14,10 @@
                                                (t/to-time-zone t (t/default-time-zone)))])
 (defn server-time [] (list "server time: " (span-time (t/now))))
 
-(defn controller-link [{addr :addr}] [:a {:href (str "api/controllers/" addr "/device")}
-                                      addr])
+(defn controller-link [{addr :addr}]
+  [:a {:href (str "api/controllers/" addr "/device")} addr])
 (defn controller
   [c]
-  #_(println "D: controller" c)
   (list (controller-link c)
         [:ul.property-list
          (when-let [t (:last-event c)]

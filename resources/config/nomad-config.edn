@@ -11,7 +11,7 @@
    :email {:admins ["dmeliza@gmail.com"]
            :send? true}}
   "aplonis"
-  {:frodo/config {:nrepl {:port nil}
+  {:frodo/config {:nrepl {:port 7888}
                   :web {:port 8020
                         :app decide-host.web/app}}
    :host {:protocol "decide-host@1"
