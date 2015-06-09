@@ -9,8 +9,8 @@
           :heartbeat-init-alive 5}
    :database {:uri "mongodb://localhost:27017/decide"}
    :email {:admins ["dmeliza@gmail.com"]
-           :send? true}}}
- "aplonis"
+           :send? true}}
+  "aplonis"
   {:frodo/config {:nrepl {:port nil}
                   :web {:port 8020
                         :app decide-host.web/app}}
@@ -21,4 +21,4 @@
    :database {:uri "mongodb://localhost:27017/decide"}
    :email {:admins ["dmeliza@gmail.com"]
            :send? true
-           :transport {:host "192.168.10.1" :port 25}}}}
+           :transport {:host "192.168.10.1" :port 25}}}}}
