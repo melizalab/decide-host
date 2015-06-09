@@ -14,7 +14,7 @@
                                                (t/to-time-zone t (t/default-time-zone)))])
 (defn server-time [] (list "server time: " (span-time (t/now))))
 
-(defn controller-link [{addr :addr}] [:a {:href (str "/api/controllers/" addr "/device")}
+(defn controller-link [{addr :addr}] [:a {:href (str "api/controllers/" addr "/device")}
                                       addr])
 (defn controller
   [c]
@@ -65,11 +65,11 @@
     [:meta {:content "yes", :name "apple-mobile-web-app-capable"}]
     [:meta {:content "black", :name "apple-mobile-web-app-status-bar-style"}]
     [:title "Decide Directory"]
-    [:link {:rel "icon" :type "image/ico" :href "/images/favicon.ico"}]
-    (include-css "/css/jquery.mobile-1.3.1.min.css")
-    (include-css "/css/directory.css")
-    (include-js "/js/jquery-2.1.4.min.js")
-    (include-js "/js/interface.js")]
+    [:link {:rel "icon" :type "image/ico" :href "/static/images/favicon.ico"}]
+    (include-css "/static/css/jquery.mobile-1.3.1.min.css")
+    (include-css "/static/css/directory.css")
+    (include-js "/static/js/jquery-2.1.4.min.js")
+    (include-js "/static/js/interface.js")]
    [:body
     [:div#page1 {:data-role "page"}
      [:div {:data-role "header"}

@@ -154,7 +154,7 @@
   (routes
    (GET "/" [] (views/index (front-page-data db)))
    (GET "/ws" req (update-handler req ws-clients))
-   (resources "/")
+   (resources "/static")
    (not-found "No such page!")))
 
 
