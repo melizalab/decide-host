@@ -12,7 +12,8 @@
           msg {:from "decide-host"
                :to to
                :subject (str "ERROR: " msg)
-               :body (str "An error occurred:\n\n" msg)}
+               :body (str "This is decide-host. An error seems to have occurred:\n\n"
+                          msg)}
           result (if trans
                    (post/send-message trans msg)
                    (post/send-message msg))]
