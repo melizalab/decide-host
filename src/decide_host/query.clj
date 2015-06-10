@@ -48,6 +48,12 @@
     (assoc query :match (dissoc m :limit) :limit (Long. limit))
     query))
 
+(defn skip
+  [{m :match :as query}]
+  (if-let [skp (:skip m)]
+    (assoc query :match (dissoc m :skip) :skip (Long. skp))
+    query))
+
 (defn sort-by
   "Sort parameters should look like :sort-field = 1,-1.
   NB: Order of keys is undefined if query is a hash map"
@@ -67,6 +73,7 @@
                      :after after-time
                      :comment comments
                      :limit-to limit-to
+                     :skip skip
                      :uuid subject-uuid
                      :sort sort-by
                      :sequences sequences})

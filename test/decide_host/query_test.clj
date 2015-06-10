@@ -37,4 +37,4 @@
           tp (tc/from-long tt)]
       (parse {:a 1 :before (str tt)}) => {:match {:a 1 :time {"$lte" tp} :comment nil}}
       (parse {:a 1 :before (str tt)} :actions [:before]) => {:match {:a 1 :time {"$lte" tp}}}
-      (parse {:a 1 :limit 10 :comment true}) => {:limit 10 :match {:a 1}}))
+      (parse {:a 1 :limit 10 :skip 10 :comment true}) => {:limit 10 :skip 10 :match {:a 1}}))
