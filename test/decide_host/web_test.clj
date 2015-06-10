@@ -2,9 +2,9 @@
   (:require [midje.sweet :refer :all]
             [decide-host.web :refer :all]
             [decide-host.test-data :refer :all]
+            [decide-host.database :as db :refer [ctrl-coll subj-coll trial-coll event-coll]]
             [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
             [clj-time.coerce :as tc]
-            [cheshire.core :as json]
             [ring.mock.request :as mock]))
 
 (defn req
@@ -60,3 +60,15 @@
         (req app :get (str uri "/today")) => (contains {:correct 3, :feed-ops 2, :trials 5})
         (req app :get (str uri "/last-hour")) =not=> nil
         (req app :get (str uri "/no-such-thing")) => (contains {:status 404}))))
+
+;; these tests are about volume
+#_(fact-group
+ :slow "large-volume http API requests"
+ (let [n 100000
+       addr (:addr controller)
+       db (populate-db n)
+       app (wrap-defaults (api-routes {:database {:db db}}) api-defaults)]
+   (fact "GET trials returns correct count"
+       (count (req app :get (url "/subjects/" subj-id "/trials"))) => n)
+   (fact "GET events returns correct count"
+       (count (req app :get (url "/controllers/" addr "/events"))) => n)))

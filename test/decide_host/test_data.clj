@@ -165,3 +165,15 @@
     (mc/insert-batch db trial-coll trial-data)
     (mc/insert-batch db event-coll event-data)
     db))
+
+(defn populate-db
+  "sets up the database with n sequential trial and event entries"
+  [n]
+  (let [{:keys [conn db]} (db/connect! test-uri)
+        trial (get trial-data 1)
+        event (get event-data 1)]
+    (mg/drop-db conn test-db)
+    (doseq [i (range n)]
+      (mc/insert db trial-coll (assoc trial :trial i :time (t/plus midnight (t/seconds 1))))
+      (mc/insert db event-coll (assoc event :time (t/plus midnight (t/seconds 1)))))
+    db))
