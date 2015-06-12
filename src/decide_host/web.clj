@@ -20,22 +20,31 @@
             [decide-host.views :as views]
             [decide-host.handlers :refer [add-handler update-subject!]]))
 
-(defn streaming-response
+(defn stream-response
+  [req {:keys [header body] :as response}]
+  (with-channel req chan
+    (send! chan
+           (-> response
+               (assoc :body nil)
+               (content-type "application/json; charset=utf-8"))
+           false)
+    (doseq [rec body
+            :let [body* (str (json/encode rec {:pretty true}) "\r\n")]]
+      (send! chan body* false))
+    (close chan))
+  ;; stupidly, with-channel returns the channel, so we need to avoid passing
+  ;; anything to other handlers that may try to return it.
+  nil)
+
+
+(defn wrap-streaming-response
   "Middleware that will return seq responses as streams of JSON objects
   separated by '\r\n'"
   [handler]
   (fn [req]
     (let [{:keys [headers body] :as response} (handler req)]
-      (println "D:" body)
       (if (seq? body)
-        (with-channel req chan
-          (send! chan (-> response
-                          (assoc :body nil)
-                          (content-type "application/json; charset=utf-8")) false)
-          (doseq [rec body
-                  :let [body* (str (json/encode rec {:pretty true}) "\r\n")]]
-            (send! chan body* false))
-          (close chan))
+        (stream-response req response)
         response))))
 
 
@@ -49,7 +58,7 @@
 
 (defn controller-view
   [db addr]
-  (when-let [result (db/find-controller-by-addr db addr)]
+  (when-let [result (first (controller-list-view db {:params {:addr addr}}))]
     {:body result}))
 
 (defn subjects-view
@@ -171,7 +180,7 @@
               (wrap-defaults api-defaults)
               (wrap-cors :access-control-allow-origin #".+"
                          :access-control-allow-methods [:get])
-              (streaming-response)
+              (wrap-streaming-response)
               (wrap-json-response :pretty true))
           (site-routes ctx))}))
     (stop! [_ system]
