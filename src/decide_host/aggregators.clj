@@ -25,7 +25,7 @@
   "Returns map of activity statistics for subject from since until now. Result
   is nil if no trials found for subject."
   [db subject since]
-  (let [match {:time {$gte since} :comment nil :subject (uuid subject)}
+  (let [match {:time {$gte since $lte (t/now)} :comment nil :subject (uuid subject)}
         [result] (mc/aggregate db trial-coll
                                 [{$match match}
                                  {$project trial-projection}
