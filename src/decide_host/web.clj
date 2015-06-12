@@ -26,23 +26,22 @@
   [handler]
   (fn [req]
     (let [{:keys [headers body] :as response} (handler req)]
+      (println "D:" body)
       (if (seq? body)
         (with-channel req chan
+          (send! chan (-> response
+                          (assoc :body nil)
+                          (content-type "application/json; charset=utf-8")) false)
           (doseq [rec body
-                  :let [body* (str (json/encode rec) "\r\n")]]
-            (send! chan
-                   (-> response
-                       (assoc :body body*)
-                       (content-type "application/json; charset=utf-8"))
-                   false))
+                  :let [body* (str (json/encode rec {:pretty true}) "\r\n")]]
+            (send! chan body* false))
           (close chan))
         response))))
 
 
-
 (defn controller-list-view
   "Returns a list of all controllers in the database"
-  [db params]
+  [db {params :params}]
   (let [params (query/parse params :actions [:sequences])]
     (map (fn [c] (assoc (select-keys c [:addr :last-seen :last-event])
                        :connected (not (nil? (:zmq-id c)))))
@@ -50,16 +49,16 @@
 
 (defn controller-view
   [db addr]
-  (when-let [result (first (controller-list-view db {:addr addr}))]
+  (when-let [result (db/find-controller-by-addr db addr)]
     {:body result}))
 
 (defn subjects-view
-  [db params]
+  [db {params :params}]
   (let [params (query/parse params :actions [:sequences :uuid])]
     #_(println "D: subjects-view" params)
     (db/find-subjects db (:match params))))
-(defn active-subjects-view [db] (subjects-view db {:controller {"$ne" nil}}))
-(defn inactive-subjects-view [db] (subjects-view db {:controller nil}))
+(defn active-subjects-view [db] (subjects-view db {:params {:controller {"$ne" nil}}}))
+(defn inactive-subjects-view [db] (subjects-view db {:params {:controller nil}}))
 
 (defn subject-view
   [db subject]
@@ -67,46 +66,44 @@
     {:body result}))
 
 (defn event-view
-  [db params]
+  [db {params :params}]
   (let [params (query/parse params)]
     #_(println "D: event-view" params)
     (db/find-events db params)))
 
 (defn trial-view
-  [db {params :params :as req}]
+  [db {params :params}]
   (let [params (query/parse params)
         trials (db/find-trials db params)]
     #_(println "D: trial-view" req)
-    #_(stream-records req (db/find-trials db params))
     (db/find-trials db params)))
 
 (defn stats-view
   [db {params :params :as req}]
   (let [params (query/parse params)]
     #_(println "D: stats-view" params)
-    (agg/hourly-stats db params)
-    #_(stream-records req (agg/hourly-stats db params))))
+    (agg/hourly-stats db params)))
 
 (defn api-routes
   [{{db :db} :database}]
   (routes
    (context "/api" []
-     (context "/controllers" [:as {params :params}]
-       (GET "/" [] (controller-list-view db params))
-       (context "/:addr" [addr :as {params :params}]
+     (context "/controllers" []
+       (GET "/" req (controller-list-view db req))
+       (context "/:addr" [addr]
          (GET "/" [] (controller-view db addr))
-         (GET "/events" [] (event-view db params))
+         (GET "/events" req (event-view db req))
          (GET "/device" [] {:status 501
                             :body "Configure proxy server to redirect to controller"})))
-     (context "/subjects" [:as {params :params}]
-       (GET "/" [] (subjects-view db params))
+     (context "/subjects" []
+       (GET "/" req (subjects-view db req))
        (GET "/active" [] (active-subjects-view db))
        (GET "/inactive" [] (inactive-subjects-view db))
-       (context "/:subject" [subject :as {params :params}]
+       (context "/:subject" [subject]
          (GET "/" [] (subject-view db subject))
          (GET "/trials" req (trial-view db req))
          (context "/stats" []
-           (GET "/" [] (stats-view db params))
+           (GET "/" req (stats-view db req))
            (GET "/today" [] {:body (agg/activity-stats-today db subject)})
            (GET "/last-hour" [] {:body (agg/activity-stats-last-hour db subject)}))))
      (not-found nil))))

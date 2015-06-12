@@ -82,7 +82,6 @@
   and :limit set to values that can be used in a mongodb query"
   [params & {:keys [actions]
              :or {actions (keys fmap)}}]
-  (assert (map? params) "parameters must be a map")
   ;; start with everything in match
   (loop [acts actions q {:match params}]
     (if-let [f (fmap (first acts))]
