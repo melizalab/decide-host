@@ -2,7 +2,6 @@
   "Translating http query parameters to mongodb database queries"
   (:refer-clojure :exclude [time sort-by])
   (:require [monger.operators :refer :all]
-            [clojure.core.incubator :refer [dissoc-in]]
             [clj-time.coerce :as tc]
             [decide-host.core :refer [uuid]]))
 

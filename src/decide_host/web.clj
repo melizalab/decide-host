@@ -5,12 +5,11 @@
             [frodo.web :refer [App]]
             [ring.util.response :refer [response content-type]]
             [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
-            [ring.middleware.format-response :refer [wrap-restful-response
-                                                     wrap-json-response]]
+            [ring.middleware.format-response :refer [wrap-json-response]]
             [ring.middleware.cors :refer [wrap-cors]]
             [compojure.core :refer [routes context GET]]
             [compojure.route :refer [resources not-found]]
-            [org.httpkit.server :refer [with-channel on-close send!]]
+            [org.httpkit.server :refer [with-channel on-close send! close]]
             [hiccup.core :refer [html]]
             [decide-host.config :refer [init-context]]
             [decide-host.core :refer [merge-in]]
@@ -20,6 +19,26 @@
             [decide-host.aggregators :as agg]
             [decide-host.views :as views]
             [decide-host.handlers :refer [add-handler update-subject!]]))
+
+(defn streaming-response
+  "Middleware that will return seq responses as streams of JSON objects
+  separated by '\r\n'"
+  [handler]
+  (fn [req]
+    (let [{:keys [headers body] :as response} (handler req)]
+      (if (seq? body)
+        (with-channel req chan
+          (doseq [rec body
+                  :let [body* (str (json/encode rec) "\r\n")]]
+            (send! chan
+                   (-> response
+                       (assoc :body body*)
+                       (content-type "application/json; charset=utf-8"))
+                   false))
+          (close chan))
+        response))))
+
+
 
 (defn controller-list-view
   "Returns a list of all controllers in the database"
@@ -54,16 +73,19 @@
     (db/find-events db params)))
 
 (defn trial-view
-  [db params]
-  (let [params (query/parse params)]
-    #_(println "D: trial-view" params)
+  [db {params :params :as req}]
+  (let [params (query/parse params)
+        trials (db/find-trials db params)]
+    #_(println "D: trial-view" req)
+    #_(stream-records req (db/find-trials db params))
     (db/find-trials db params)))
 
 (defn stats-view
-  [db params]
+  [db {params :params :as req}]
   (let [params (query/parse params)]
     #_(println "D: stats-view" params)
-    (agg/hourly-stats db params)))
+    (agg/hourly-stats db params)
+    #_(stream-records req (agg/hourly-stats db params))))
 
 (defn api-routes
   [{{db :db} :database}]
@@ -82,7 +104,7 @@
        (GET "/inactive" [] (inactive-subjects-view db))
        (context "/:subject" [subject :as {params :params}]
          (GET "/" [] (subject-view db subject))
-         (GET "/trials" [] (trial-view db params))
+         (GET "/trials" req (trial-view db req))
          (context "/stats" []
            (GET "/" [] (stats-view db params))
            (GET "/today" [] {:body (agg/activity-stats-today db subject)})
@@ -152,9 +174,8 @@
               (wrap-defaults api-defaults)
               (wrap-cors :access-control-allow-origin #".+"
                          :access-control-allow-methods [:get])
-              (wrap-restful-response :formats [:json-kw :edn
-                                               :transit-json :transit-msgpack])
-              #_(wrap-json-response :pretty true))
+              (streaming-response)
+              (wrap-json-response :pretty true))
           (site-routes ctx))}))
     (stop! [_ system]
       (host/stop! (:context system)))))
