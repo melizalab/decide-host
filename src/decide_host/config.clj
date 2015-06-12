@@ -2,7 +2,7 @@
   (:require [clojure.java.io :as io]
             [nomad :refer [defconfig]]))
 
-(defconfig config (io/resource "config/nomad-config.edn"))
+(defconfig config (io/resource "config/decide-config.edn"))
 
 (defn init-context []
   (assoc (select-keys (config) [:database :host :email])

@@ -1,13 +1,17 @@
 # decide-host
 
-Decide is an event-driven state-machine framework for running behavioral experiments on node.js. This repository contains code for `decide-host`, a process that collates data from devices running `decide`.
+Decide is an event-driven state-machine framework for running behavioral experiments with embeddable computers like the Beaglebone Black. This repository contains code for `decide-host`, a process that collates data from multiple devices running `decide`. Among other functions, it tracks what subjects are running experiments on what controller, notifies responsible parties when controllers disconnect unexpectedly, and provides an HTTP API for access to trial data and a simple web page that summarizes the current state of the system.
 
 ## Getting started
 
-Detailed instructions for configuring a private local area network for your devices are given in [[docs/deploying]]. For testing purposes, you can run `decide-host` on the computer connected by USB link to the device, or even on the same computer. You'll need to edit `config/host-config.json` and set the following fields:
+Detailed instructions for configuring a private local area network for your devices are given in [[docs/deploying]]. For testing purposes, you can run `decide-host` on the computer connected by USB link to the device, or even on the same computer. You will need to have the following installed:
 
-- `addr_int`: the address of the host computer on the internal network
-- `log_db`: the URI of the [mongo](https://mongodb.org) database to store event and trial records. You may omit this field; records are always logged to text files.
-- `mail_transport`: specifies the host and port of a mail transport agent that can deliver error messages to users. You may omit this field, in which case mail delivery falls back on the default mechanism used by [nodemailer](http://www.nodemailer.com/). Be warned that this mechanism may fail, so be sure it works before deploying.
+- [leiningen](http://leiningen.org/), 2.0 or later
+- [MongoDB](https://mongodb.org/), 3.0 or later
+- [zeromq](http://zeromq.org), version 3. Note that on OS X, if you install zeromq using MacPorts, you'll need to make a symbolic link from `/opt/local/lib/libzmq.3.dylib` to `/usr/local/lib` in order for the java bindings to find the library.
 
-`decide-host` is written in [Clojurescript](https://github.com/clojure/clojurescript), which gets compiled to Javascript that runs in [node](https://nodejs.org/). You will need to have [leiningen](http://leiningen.org/) and [npm](https://www.npmjs.com/) installed in order to fetch dependencies and compile the code. Run `lein cljsbuild once` from the root of the repository and then `npm install`.
+You may wish to edit `resources/config/decide-config.edn` to set values for your system.
+
+Run `lein frodo` to start the server. You should be able to connect to <http://localhost:8020> and see a summary of subjects and connected controllers that will update with new events, experiments, and trials. There is also an HTTP API for accessing this information as well as for retrieving trial and event data. See [[docs/decide-http-api]] for details.
+
+You should also probably install `decide-analysis` for some simple python scripts that monitor hopper failures and hourly activity.

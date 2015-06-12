@@ -24,7 +24,7 @@
                  [clj-time "0.8.0"]]
 
   :plugins [[jarohen/lein-frodo "0.4.1"]]
-  :frodo/config-resource "config/nomad-config.edn"
+  :frodo/config-resource "config/decide-config.edn"
   ;; :global-vars {*warn-on-reflection* true}
 
   :target-path "target/%s"

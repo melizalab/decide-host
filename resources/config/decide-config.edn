@@ -1,0 +1,45 @@
+;;; This file contains configuration information for decide-host.
+;;;
+;;; Configuration uses nomad (https://github.com/james-henderson/nomad) to
+;;; support different options on different hosts. Options are specified using
+;;; clojure key-value notation. The first set of values are defaults that would
+;;; be used for all hosts. Values you might want to customize are commented.
+{:frodo/config {:nrepl {:port nil}
+;;; HTTP server options
+                :web {:app decide-host.web/app
+                      ;; ip address to bind to. Default listens to all interfaces.
+                      :http-kit/options {:ip "0.0.0.0"}
+                      ;; port to listen for connections
+                      :port 8020}}
+;;; Host options for connections from controllers
+ :host {:protocol "decide-host@1"
+        ;; IP address and port to bind. '*' allows connections from any address
+        :addr "tcp://*:5555"
+        :heartbeat-ms 2000
+        :heartbeat-init-alive 10}
+;;; Options for backing database
+ :database {:uri "mongodb://localhost:27017/decide"}
+;;; Options for sending emails to users and admins
+ :email {:admins []
+         ;; send error emails?
+         :send? true
+         ;; if nil, uses sendmail for transport. see below for example of SMTP server
+         :transport nil}
+;;; host-specific configuration. Each host configuration is specified by the
+;;; hostname and a map that will override values in the defaults above. You can
+;;; edit one of the examples below or create your own
+ :nomad/hosts
+ ;; typical values for a development machine
+ {"pica"
+  {:frodo/config {:nrepl {:port 7888}}  ; provide a REPL for debugging
+   :host {:addr "tcp://*:5555"}
+   :email {:admins ["dmeliza@gmail.com"]}}
+  ;; typical values for a deployment machine. http connections are restricted to
+  ;; localhost (we will use nginx to proxy and provide TLS), and controller
+  ;; connections are restricted to the internal network. The host machine also
+  ;; has a mail transport agent configured that can relay mail
+  "aplonis"
+  {:frodo/config {:web {:http-kit/options {:ip "127.0.0.1"}}}
+   :host {:addr "tcp://192.168.10.1:5555"}
+   :email {:admins ["cdm8j@virginia.edu"]
+           :transport {:host "192.168.10.1" :port 25}}}}}
