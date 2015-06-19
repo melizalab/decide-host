@@ -1,6 +1,6 @@
 (ns decide-host.views
   "HTML views"
-  (:require [decide-host.core :refer [print-kv]]
+  (:require [decide-host.core :refer [print-kv version]]
             [clj-time.format :as tf]
             [clj-time.core :as t]
             [hiccup.core :refer [html]]
@@ -45,6 +45,7 @@
 (defn console
   [{:keys [controllers active-subjects inactive-subjects]}]
   (list
+   [:p "version: " (span-value version)]
    [:p#time (server-time)]
    [:div#controllers
     [:p.ahead "Registered Controllers"]

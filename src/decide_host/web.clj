@@ -12,7 +12,7 @@
             [org.httpkit.server :refer [with-channel on-close send! close]]
             [hiccup.core :refer [html]]
             [decide-host.config :refer [init-context]]
-            [decide-host.core :refer [merge-in]]
+            [decide-host.core :refer [version]]
             [decide-host.host :as host]
             [decide-host.query :as query]
             [decide-host.database :as db]
@@ -170,6 +170,7 @@
 (def app
   (reify App
     (start! [_]
+      (println "I: this is decide-host, version" version)
       (let [ctx (host/start! (init-context))]
         (add-handler ctx update-subject! :state-changed :trial-data)
         (add-handler ctx update-clients! :state-changed :trial-data :connect :disconnect)
