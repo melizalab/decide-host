@@ -6,7 +6,7 @@ db.events.ensureIndex({addr: 1, name: 1});
 db.events.ensureIndex({addr: 1, time: 1});
 
 db.trials.ensureIndex({addr: 1, name: 1});
-db.trials.ensureIndex({addr: 1, time: 1});
+db.trials.ensureIndex({subject: 1, time: 1});
 db.trials.ensureIndex({subject: 1, experiment: 1, trial: 1})
 
 db.subjects.ensureIndex({addr: 1});
