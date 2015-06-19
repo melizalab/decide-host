@@ -111,7 +111,7 @@
 ;; trials and events
 (defn- find-generic
   [db coll & [{:keys [match sort limit]
-               :or {sort {:time 1}
+               :or {sort (array-map :time 1)
                     limit 0}}]]
   (q/with-collection db coll
     (q/find match)
@@ -123,9 +123,10 @@
 
 ;;; convenience methods
 (defn connect!
-  "Connect to a mongodb database. Returns map with :conn and :db"
-  [uri]
-  (let [res (mg/connect-via-uri uri)]
-    (mg/get-db-names (:conn res))       ; will throw error for bad connection
+  "Connect to a mongodb database."
+  [context]
+  (let [uri (get-in context [:database :uri])
+        {:keys [conn db]} (mg/connect-via-uri uri)]
+    (mg/get-db-names conn)       ; will throw error for bad connection
     (println "I: connected to database at" uri)
-    (assoc res :uri uri)))
+    (assoc-in context [:database :db] db)))

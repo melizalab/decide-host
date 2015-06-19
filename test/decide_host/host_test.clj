@@ -24,7 +24,7 @@
   (let [ctx {:database {:uri (str "mongodb://localhost/" test-db)}
              :host {:protocol protocol
                     :heartbeat-init-alive 1}}]
-    (assoc ctx :database (db/connect! (get-in ctx [:database :uri])))))
+    (assoc ctx :database (mg/connect-via-uri (get-in ctx [:database :uri])))))
 
 (defn count-controllers [context]
   (count (db/find-connected-controllers (get-in context [:database :db]))))

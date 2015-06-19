@@ -82,9 +82,8 @@
 
 (defn trial-view
   [db {params :params}]
-  (let [params (query/parse params)
-        trials (db/find-trials db params)]
-    #_(println "D: trial-view" req)
+  #_(println "D: trial-view" params)
+  (let [params (query/parse params)]
     (db/find-trials db params)))
 
 (defn stats-view
@@ -171,9 +170,12 @@
   (reify App
     (start! [_]
       (println "I: this is decide-host, version" version)
-      (let [ctx (host/start! (init-context))]
-        (add-handler ctx update-subject! :state-changed :trial-data)
-        (add-handler ctx update-clients! :state-changed :trial-data :connect :disconnect)
+      (let [ctx (-> (init-context)
+                    (db/connect!)
+                    (host/start!))]
+        (when (get-in ctx [:host :addr])
+          (add-handler ctx update-subject! :state-changed :trial-data)
+          (add-handler ctx update-clients! :state-changed :trial-data :connect :disconnect))
         {:context ctx
          :frodo/handler
          (routes
@@ -185,4 +187,4 @@
               (wrap-json-response :pretty true))
           (site-routes ctx))}))
     (stop! [_ system]
-      (host/stop! (:context system)))))
+      #_(host/stop! (:context system)))))

@@ -7,7 +7,7 @@
 (def test-db "decide-test")
 (def test-uri (str "mongodb://localhost/" test-db))
 
-(let [context {:database (db/connect! test-uri)}
+(let [context {:database (mg/connect-via-uri test-uri)}
       {{db :db conn :conn} :database} context ]
   (mg/drop-db conn test-db)
   (let [sock-id "test-ctrl"

@@ -1,7 +1,7 @@
 (ns decide-host.test-data
   (:require [decide-host.core :refer [uuid]]
             [clj-time.core :as t]
-            [decide-host.database :as db :refer [ctrl-coll subj-coll trial-coll event-coll]]
+            [decide-host.database :refer [ctrl-coll subj-coll trial-coll event-coll]]
             [monger.core :as mg]
             [monger.collection :as mc]))
 
@@ -158,7 +158,7 @@
                    :user nil}])
 
 (defn setup-db []
-  (let [{:keys [conn db]} (db/connect! test-uri)]
+  (let [{:keys [conn db]} (mg/connect-via-uri test-uri)]
     (mg/drop-db conn test-db)
     (mc/insert db ctrl-coll controller)
     (mc/insert db subj-coll subject)
@@ -169,7 +169,7 @@
 (defn populate-db
   "sets up the database with n sequential trial and event entries"
   [n]
-  (let [{:keys [conn db]} (db/connect! test-uri)
+  (let [{:keys [conn db]} (mg/connect-via-uri test-uri)
         trial (get trial-data 1)
         event (get event-data 1)]
     (mg/drop-db conn test-db)

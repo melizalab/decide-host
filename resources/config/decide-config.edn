@@ -13,8 +13,6 @@
                       :port 8020}}
 ;;; Host options for connections from controllers
  :host {:protocol "decide-host@1"
-        ;; IP address and port to bind. '*' allows connections from any address
-        :addr "tcp://*:5555"
         :heartbeat-ms 2000
         :heartbeat-init-alive 10}
 ;;; Options for backing database
@@ -29,11 +27,14 @@
 ;;; hostname and a map that will override values in the defaults above. You can
 ;;; edit one of the examples below or create your own
  :nomad/hosts
+
  ;; typical values for a development machine
  {"pica"
   {:frodo/config {:nrepl {:port 7888}}  ; provide a REPL for debugging
+   ;; IP address and port for controller connections. '*' allows connections from any address
    :host {:addr "tcp://*:5555"}
    :email {:admins ["dmeliza@gmail.com"]}}
+
   ;; typical values for a deployment machine. http connections are restricted to
   ;; localhost (we will use nginx to proxy and provide TLS), and controller
   ;; connections are restricted to the internal network. The host machine also

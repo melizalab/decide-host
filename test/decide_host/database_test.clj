@@ -10,15 +10,18 @@
             [clj-time.coerce :as tc]))
 
 (def test-db "decide-test")
-(def test-uri (str "mongodb://localhost/" test-db))
+(def context {:database {:uri (str "mongodb://localhost/" test-db)}})
 (def INIT-ALIVE 5)
 
 (fact "bad uris generate exceptions"
-    (connect! "garbledegook") => (throws Exception)
-    (connect! "mongodb://localhost:1234/decide-test") => (throws Exception))
+    (connect! {:database {:uri "garbledegook"}}) => (throws Exception)
+    (connect! {:database {:uri "mongodb://localhost:1234/decide-test"}}) => (throws Exception))
 
-(let [{:keys [conn db]} (connect! test-uri)
-      subject "acde" sock-id "test-ctrl" addr "test" tt (t/now)]
+(let [subject "acde"
+      sock-id "test-ctrl"
+      addr "test"
+      tt (t/now)
+      {:keys [conn db]} (mg/connect-via-uri (get-in context [:database :uri]))]
   (mg/drop-db conn test-db)
   (with-state-changes [(after :facts (mg/drop-db conn test-db))]
     (fact "about controller state management"

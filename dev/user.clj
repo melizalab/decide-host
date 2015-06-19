@@ -5,22 +5,10 @@
             [clojure.repl :refer :all]
             [clojure.tools.namespace.repl :refer [set-refresh-dirs refresh refresh-all]]
             [clojure.stacktrace :refer [e]]
+            [monger.core :as mg]
+            [monger.collection :as mc]
+            [monger.query :as mq]
+            [clj-time.core :as t]
             [decide-host.config :refer [config]]))
 
 (set-refresh-dirs "src")
-
-(def context nil)
-
-(defn init []
-  (let [cfg (config)]
-    (alter-var-root #'context (constantly [(get-in cfg [:database :uri])
-                                           (get-in cfg [:zmq :endpoint])]))))
-
-;; (defn start
-;;   []
-;;   (println "I: this is decide-host, version" version)
-;;   (alter-var-root #'context host/start!))
-
-;; (defn stop
-;;   []
-;;   (alter-var-root #'context host/stop!))

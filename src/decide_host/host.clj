@@ -145,8 +145,7 @@
           (recur (<!! zout))))
       (println "I: released decide-host socket")
       (async/close! events))
-    {:event-chan events                 ; only used for testing
-     :event-pub (async/pub events :topic)}))
+    (assoc-in context [:msg-handler :event-pub] (async/pub events :topic))))
 
 (defn- start-heartbeat
   [context interval]
@@ -159,7 +158,7 @@
             (dorun (map #(check-connection! context %) (db/find-connected-controllers db)))
             (recur))))
       #_(println "D: heartbeat handler stopping"))
-    {:ctrl ctrl-chan}))
+    (assoc-in context [:heartbeat :ctrl] ctrl-chan)))
 
 (defn- start-zmq-server
   "Starts a server that will bind a zeromq socket to addr."
@@ -174,11 +173,11 @@
                               :out zmq-out}})))
 
 (defn start! [context]
-  (let [c1 (assoc context :database (db/connect! (get-in context [:database :uri])))
-        c2 (start-zmq-server c1)]
-    (assoc c2
-           :heartbeat (start-heartbeat c2 2000)
-           :msg-handler (start-message-handler c2))))
+  (when (get-in context [:host :addr])
+    (-> context
+        (start-zmq-server)
+        (start-heartbeat 2000)
+        (start-message-handler))))
 
 (defn stop! [context]
   (async/close! (get-in context [:host :in]))
