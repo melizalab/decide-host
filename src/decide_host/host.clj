@@ -180,5 +180,7 @@
         (start-message-handler))))
 
 (defn stop! [context]
-  (async/close! (get-in context [:host :in]))
-  (async/put! (get-in context [:heartbeat :ctrl]) :stop))
+  (when-let [chan (get-in context [:host :in])]
+    (async/close! chan))
+  (when-let [chan (get-in context [:heartbeat :ctrl])]
+    (async/put! chan :stop)))

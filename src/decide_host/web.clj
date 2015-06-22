@@ -187,4 +187,4 @@
               (wrap-json-response :pretty true))
           (site-routes ctx))}))
     (stop! [_ system]
-      #_(host/stop! (:context system)))))
+      (host/stop! (:context system)))))
