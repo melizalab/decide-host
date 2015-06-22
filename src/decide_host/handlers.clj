@@ -19,32 +19,35 @@
 (defn update-subject!
   "Updates subject documents with event data"
   [context data]
-  #_(println "D: update-subject!" data)
+
   (let [{{db :db} :database} context]
-    (match [data]
+    (match
+     [data]
+     [{:topic :state-changed :name "experiment"
+       :subject s :procedure p :user u :time t :addr a}]
+     (let [{subj :_id proc :procedure} (db/find-subject-by-addr db a)]
+       (println "D: update-subject!" data)
+       (cond
+         (and s (not= p proc))
+         (do
+           (println "I:" a "-" s "started running" p)
+           (db/start-subject! db s {:procedure p :controller a :user u :start-time t}))
+         (and (nil? s) proc)
+         (do
+           (println "I:" a "-" subj "stopped running" proc)
+           (db/stop-subject! db a t))))
 
-           [{:topic :state-changed :name "experiment"
-             :subject s :procedure p :user u :time t :addr a}]
-           (if-not (nil? s)
-               (do
-                 (println "I:" a "started running" p)
-                 (db/start-subject! db s {:procedure p :controller a :user u :start-time t}))
-               (do
-                 ;; TODO look up subject so we know whether it's stopping
-                 (println "I:" a "is not running a procedure")
-                 (db/stop-subject! db a t)))
+     [{:topic :state-changed :name "hopper" :up state :addr a :time t}]
+     (when state
+       (db/update-subject-by-controller! db a {:last-fed t}))
 
-           [{:topic :state-changed :name "hopper" :up state :addr a :time t}]
-           (when state
-             (db/update-subject-by-controller! db a {:last-fed t}))
+     [{:topic :state-changed :addr a :time t}]
+     (db/update-controller! db a {:last-event t})
 
-           [{:topic :state-changed :addr a :time t}]
-           (db/update-controller! db a {:last-event t})
+     [{:topic :trial-data :subject s :trial n :time t}]
+     (db/update-subject! db s {:last-trial t})
 
-           [{:topic :trial-data :subject s :trial n :time t}]
-           (db/update-subject! db s {:last-trial t})
+     [{:topic :trial-data :subject s :experiment e}]
+     (db/update-subject! db s {:experiment e})
 
-           [{:topic :trial-data :subject s :experiment e}]
-           (db/update-subject! db s {:experiment e})
-
-           :else nil)))
+     :else nil)))
