@@ -65,15 +65,14 @@
 
 ;; events and trials
 (defn log-message! [db data-type data-id data]
-  (if-let [coll (case data-type
+  (when-let [coll (case data-type
                     "state-changed" event-coll
                     "trial-data" trial-coll
                     nil)]
     (let [obj-id (object-id data-id)
           data (convert-subject-uuid data)]
         (if (updated-existing? (mc/update db coll {:_id obj-id} data {:upsert true}))
-          :dup :ack))
-      :rtfm-dtype))
+          :dup :ack))))
 
 ;;; database query functions
 ;; controllers

@@ -56,6 +56,7 @@
 
 ;; most of the request-reply logic is tested in core-test and is not duplicated
 ;; here. Mostly we want to check that heartbeating works as expected.
+;; TODO out of date
 #_(let [context (start-host (init-context))]
   (fact-group :integration "client-server integration"
     (let [{:keys [in out]} (connect-client server-address)

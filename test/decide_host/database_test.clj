@@ -49,7 +49,7 @@
     (fact "about logging messages"
         (let [oid (.toString (object-id))
               message {:subject "acde" :time 12345}]
-          (log-message! db "not-a-valid-message-type" oid message) => :rtfm-dtype
+          (log-message! db "not-a-valid-message-type" oid message) => nil
           (log-message! db "state-changed" oid message) => :ack
           (log-message! db "state-changed" oid message) => :dup
           (log-message! db "trial-data" oid message) => :ack

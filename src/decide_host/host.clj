@@ -8,19 +8,23 @@
             [clojure.core.match :refer [match]]
             [clj-time.core :as t]
             [clj-time.coerce :as tc]
-            [cheshire.core :as json]))
+            [cheshire.core :as json])
+  (:import (com.fasterxml.jackson.core JsonParseException)))
 
 (defn pub
   "Publishes an event to subscribers. Data should be a map"
   [chan topic data]
   (when chan (async/put! chan (assoc data :topic (keyword topic)))))
 
-(defn decode-pub
-  "Decodes payload of a PUB message, returning nil on errors"
+(defn decode-json
+  "Decodes payload of a PUB message"
   [bytes]
-  (try
-    (json/parse-string (to-string bytes) true)
-    (catch Exception e nil)))
+  (json/parse-string (to-string bytes) true))
+
+(defn clock-err
+  "Returns difference between time (in ms since epoch) and host time"
+  [time]
+  (- time (tc/to-long (t/now))))
 
 (defn set-alive! [context id]
   (let [{{db :db} :database {val :heartbeat-init-alive} :host} context]
@@ -60,7 +64,22 @@
       (pub events :disconnect {:addr addr}))
     (db/remove-controller! db sock-id)) nil)
 
-(defn store-data!
+(defn open-peering
+  [context id addr data-str]
+  (println "D: open-peering" id addr data-str)
+  (try
+    (let [clock-tol (get-in context [:host :clock-tolerance])
+          data (decode-json data-str)
+          clock-diff (clock-err (:time data))]
+      (if (and (> clock-diff (- clock-tol)) (< clock-diff clock-tol))
+        (case (connect! context id addr)
+             :ok ["OHAI-OK"]
+             :wtf ["WTF" (str addr " is already connected")])
+        ["WTF" (str "clock is off by too much (" clock-diff " ms)")]))
+    (catch JsonParseException e ["RTFM" "error parsing JSON"])
+    (catch NullPointerException e ["RTFM" "missing time field in message"])))
+
+(defn store-data
   "Stores PUB data in the database. Returns :ack on success, :dup for duplicate
   messages (which are ignored, :rtfm for unsupported data types, and nil for
   invalid/unparseable data"
@@ -69,40 +88,38 @@
   (let [{{db :db} :database events :event-chan} context]
     (set-alive! context id)
     (if-let [addr (:addr (db/find-controller-by-socket db id))]
-      (if-let [data (decode-pub data)]
-        (let [time (:time data)
+      (try
+        (let [data (decode-json data)
+              time (:time data)
               data (assoc data
                           :addr addr
                           :time (tc/from-long (long (/ time 1000)))
                           :usec (mod time 1000))]
           (pub events data-type data)
-          (db/log-message! db data-type data-id data))
-        :rtfm-fmt)
-      :who?)))
+          (case (db/log-message! db data-type data-id data)
+            :ack ["ACK" data-id]
+            :dup ["DUP" data-id]
+            ["RTFM" (str "unsupported data type " data-type)]))
+        (catch JsonParseException e ["RTFM" "error parsing JSON"])
+        (catch NullPointerException e ["RTFM" "missing time field in message"]))
+      ["WHO?"])))
 
 (defn process-message!
   "Processes decide-host messages from clients. Returns the reply message."
   [context id & data]
-  (let [{{db :db} :database {protocol :protocol} :host} context
+  (let [{{db :db} :database
+         {protocol :protocol} :host} context
         [ps s1 s2 s3] (map to-string data)]
-    #_(println "D: received" id ps s1 s2 s3)
     (match [ps s1 s2 s3]
            ;; open-peering
-           ["OHAI" protocol (addr :guard (complement nil?)) _]
-           (case (connect! context id addr)
-             :ok ["OHAI-OK"]
-             :wtf ["WTF" (str addr " is already connected")])
+           ["OHAI" protocol (addr :guard (complement nil?)) data-str]
+           (open-peering context id addr data-str)
            ["OHAI" wrong-protocol _ _]
            ["RTFM" (str "wrong protocol or handshake")]
 
            ;; use-peering
            ["PUB" data-type data-id data-str]
-           (case (store-data! context id data-type data-id data-str)
-             :ack ["ACK" data-id]
-             :dup ["DUP" data-id]
-             :rtfm-dtype ["RTFM" (str "unsupported data type " data-type)]
-             :who?  ["WHO?"]
-             :rtfm-fmt   ["RTFM" "error parsing data"])
+           (store-data context id data-type data-id data-str)
            ["HUGZ" _ _ _]
            (do
              (set-alive! context id)
@@ -113,7 +130,7 @@
            ["KTHXBAI" _ _ _] (disconnect! context id)
 
            ;; error message
-           :else ["RTFM" (str "unrecognized command '" ps "'")])))
+           :else ["RTFM" (str "unrecognized or invalid command syntax for '" ps "'")])))
 
 (defn check-connection!
   [context controller]

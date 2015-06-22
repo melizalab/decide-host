@@ -13,6 +13,7 @@
                       :port 8020}}
 ;;; Host options for connections from controllers
  :host {:protocol "decide-host@1"
+        :clock-tolerance 10000
         :heartbeat-ms 2000
         :heartbeat-init-alive 10}
 ;;; Options for backing database
