@@ -34,7 +34,7 @@
            (db/start-subject! db s {:procedure p :controller a :user u :start-time t}))
          (and (nil? s) proc)
          (do
-           (log a ":" subj "stopped running" proc)
+           (log a ":" (str subj) "stopped running" proc)
            (db/stop-subject! db a t))))
 
      [{:topic :state-changed :name "hopper" :up state :addr a :time t}]

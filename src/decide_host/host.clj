@@ -58,9 +58,9 @@
         {addr :addr} (db/find-controller-by-socket db sock-id)]
     (when addr
       (if err
-        (if-let [subj (db/find-subject-by-addr db addr)]
-          (error-msg context (str addr " disconnected unexpectedly!") (:user subj))
-          (log addr ": disconnected")))
+        (when-let [subj (db/find-subject-by-addr db addr)]
+          (error-msg context (str addr " disconnected unexpectedly!") (:user subj)))
+        (log addr ": disconnected"))
       (pub events :disconnect {:addr addr}))
     (db/remove-controller! db sock-id)) nil)
 
