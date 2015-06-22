@@ -1,6 +1,7 @@
 (ns decide-host.handlers
   "Functions that perform asynchronous, non-core responses to controller events"
   (:require [decide-host.database :as db]
+            [decide-host.core :refer [log]]
             [clojure.core.async :as async :refer [>! <! >!! <!!]]
             [clojure.core.match :refer [match]]))
 
@@ -19,22 +20,21 @@
 (defn update-subject!
   "Updates subject documents with event data"
   [context data]
-
+  #_(println "D: update-subject!" data)
   (let [{{db :db} :database} context]
     (match
      [data]
      [{:topic :state-changed :name "experiment"
        :subject s :procedure p :user u :time t :addr a}]
      (let [{subj :_id proc :procedure} (db/find-subject-by-addr db a)]
-       (println "D: update-subject!" data)
        (cond
          (and s (not= p proc))
          (do
-           (println "I:" a "-" s "started running" p)
+           (log a ":" s "started running" p)
            (db/start-subject! db s {:procedure p :controller a :user u :start-time t}))
          (and (nil? s) proc)
          (do
-           (println "I:" a "-" subj "stopped running" proc)
+           (log a ":" subj "stopped running" proc)
            (db/stop-subject! db a t))))
 
      [{:topic :state-changed :name "hopper" :up state :addr a :time t}]

@@ -11,6 +11,9 @@
 (defn hex-to-bytes [^String x] (.toByteArray (BigInteger. x 16)))
 (defn print-kv [stats] (join ", " (for [[k v] stats] (str (name k) ": " v))))
 
+(defn log [& args]
+  (apply println "[decide-host]" args))
+
 (defn object-id
   "Returns a new BSON ObjectID, either newly generated or from a string
   argument. If the string can't be converted to an ObjectID, it's returned

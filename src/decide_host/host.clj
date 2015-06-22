@@ -42,7 +42,7 @@
            [(_ :guard pos?) (wrong-id :guard (complement nil?))] :wtf
            ;; otherwise, add or update existing record
            :else (do
-                   (println "I:" ctrl-addr "connected")
+                   (log ctrl-addr ": connected")
                    (pub events :connect {:addr ctrl-addr})
                    (db/remove-controller! db sock-id)
                    (db/add-controller! db sock-id ctrl-addr)
@@ -58,15 +58,15 @@
         {addr :addr} (db/find-controller-by-socket db sock-id)]
     (when addr
       (if err
-        (let [subj (db/find-subject-by-addr db addr)]
-          (error-msg context (str addr " disconnected unexpectedly") (:user subj)))
-        (println "I:" addr "disconnected"))
+        (if-let [subj (db/find-subject-by-addr db addr)]
+          (error-msg context (str addr " disconnected unexpectedly!") (:user subj))
+          (log addr ": disconnected")))
       (pub events :disconnect {:addr addr}))
     (db/remove-controller! db sock-id)) nil)
 
 (defn open-peering
   [context id addr data-str]
-  (println "D: open-peering" id addr data-str)
+  #_(println "D: open-peering" id addr data-str)
   (try
     (let [clock-tol (get-in context [:host :clock-tolerance])
           data (decode-json data-str)
@@ -160,7 +160,7 @@
             #_(println "D: sending" id result)
             (>!! zin (cons (hex-to-bytes id) result)))
           (recur (<!! zout))))
-      (println "I: released decide-host socket")
+      (log "released socket")
       (async/close! events))
     (assoc-in context [:msg-handler :event-pub] (async/pub events :topic))))
 
@@ -185,7 +185,7 @@
         zmq-out (async/chan (async/sliding-buffer 64))]
     (register-socket! {:in zmq-in :out zmq-out :socket-type :router
                        :configurator (fn [socket] (.bind socket addr))})
-    (println "I: bound decide-host to" addr)
+    (log "listening to controllers on" addr)
     (merge-in context {:host {:in zmq-in
                               :out zmq-out}})))
 

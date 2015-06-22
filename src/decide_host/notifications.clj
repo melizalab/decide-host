@@ -1,12 +1,13 @@
 (ns decide-host.notifications
-  (require [postal.core :as post]))
+  (require [postal.core :as post]
+           [decide-host.core :refer [log]]))
 
 (defn error-msg
   [{{admins :admins
      send? :send?
      trans :transport
      :or {admins []}} :email} msg & additional-recipients]
-  (println "E:" msg)
+  (log "ERROR:" msg)
   (when send?
     (let [to (concat admins additional-recipients)
           msg {:from "decide-host"
@@ -17,4 +18,4 @@
           result (if trans
                    (post/send-message trans msg)
                    (post/send-message msg))]
-      (println "I: sending message to" to ":" (:message result)))))
+      (log "sending message to" to ":" (:message result)))))

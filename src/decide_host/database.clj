@@ -127,5 +127,5 @@
   (let [uri (get-in context [:database :uri])
         {:keys [conn db]} (mg/connect-via-uri uri)]
     (mg/get-db-names conn)       ; will throw error for bad connection
-    (println "I: connected to database at" uri)
+    (log "connected to database at" uri)
     (assoc-in context [:database :db] db)))
