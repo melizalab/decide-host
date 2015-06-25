@@ -9,9 +9,9 @@ software to talk to a host computer.
 
 ## Goals and framework
 
-The `decide` operant control software is designed to run on embedded computers (**controllers**) that can directly connect to manipulanda, cues, and reinforcers. The controllers can connect to a server (**host**) that aggregates and stores data from the controllers and provides a secure gateway to outside clients. This document describes the protocol used by the controller and host to communicate.
+The `decide` operant control software is designed to run on embedded computers (**controllers**) that can directly connect to manipulanda, cues, and reinforcers. The controllers can connect to a server (**host**) that aggregates and stores data from the controllers and provides a secure gateway to outside clients. This document describes the protocol used by the controller and host.
 
-The current implementation of the protocol uses zeromq because of its robustness and support for transparent reconnection, but may be implemented on any other transport layer that supports bidirectional communication.
+The current implementation of the protocol uses zeromq because of its robustness and support for transparent reconnection, but may be implemented on any other transport layer that supports bidirectional communication. Because the protocol is intended to run on a private, wired network, it emphasizes readability over efficiency by using string encoding.
 
 ## Language
 
@@ -49,6 +49,6 @@ WTF             = "WTF" reason            ; runtime errors
 RTFM            = "RTFM" reason           ; logic errors
 ```
 
-After connecting for the first time, the client must initiate peering by sending OHAI, which specifies the protocol, the client's non-qualified hostname, and a JSON-encoded string with the field `time` set to the client's current POSIX timestamp. The host must respond with OHAI-OK if the connection was successful or with a WTF or RTFM error message if not. Error conditions include: another connection is associated with the client; the client's timestamp is more than 5 seconds off from the server's; or the client's requested protocol is not supported.
+After connecting for the first time, the client must initiate peering by sending OHAI, which specifies the protocol, the client's non-qualified hostname, and a JSON-encoded message with the field `time` set to the client's current POSIX timestamp. The host must respond with OHAI-OK if the connection was successful or with a WTF or RTFM error message if not. Error conditions include: another connection is associated with the client; the client's timestamp is more than 5 seconds off from the server's; or the client's requested protocol is not supported.
 
-The client sends data to be stored to the host using PUB messages, which comprise the message type, a unique message identifier (to be determined by the client), and the message data, encoded as JSON. Recommended message identifiers are UUIDs or BSON ObjectIDs. The host must respond with an ACK if the message was successfully stored in the database, DUP if the message was a duplicate of a message already stored, WHO? if the socket is not associated with a controller (this could happen if the host decided the client had disconnected), or RTFM if the message failed to decode or the message type was not supported.
+The client sends data to be stored to the host using PUB messages, which comprise the message type, a unique message identifier (to be determined by the client), and the message data, encoded as JSON. Recommended message identifiers are UUIDs or BSON ObjectIDs. The host must respond with an ACK if the message was successfully stored in the database, DUP if the message was a duplicate of a message already stored, WHO? if the socket is not associated with a controller (this could happen if the host decided the client had disconnected), or RTFM if the message failed to decode or the message type was not supported. If the client receives a WHO? response to a PUB message, it should attempt to re-open peering.

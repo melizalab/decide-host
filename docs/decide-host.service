@@ -8,14 +8,13 @@ ConditionPathExists=|/srv/decide
 
 [Service]
 WorkingDirectory=/srv/decide
-ExecStart=/usr/bin/node /srv/decide/scripts/decide-host.js
+ExecStart=/usr/bin/java -jar /srv/decide/target/uberjar/decide-2.0.0-standalone.jar
 Restart=always
 StandardOutput=syslog
-SyslogIdentifier=decide-ctrl
+SyslogIdentifier=decide-host
 User=nobody
 Group=operant
 Environment=PATH=/usr/bin:/usr/local/bin:
-Environment=NODE_ENV=production
 
 [Install]
 WantedBy=multi-user.target
