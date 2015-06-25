@@ -53,9 +53,11 @@ With this configuration, emails from the controllers will be addressed from
 
 For debugging and testing purposes, running `lein frodo` in a virtual terminal works well, but for deployment you should compile a jar file and run the program as a daemon so that it's always available.  These instructions assume `systemd` is being used for service management.
 
-TODO instructions here.
+1. Run `lein frodo uberjar` in the source directory. Note the name of the jar file this command creates (e.g. `/srv/decide/target/uberjar/decide-2.0.0-standalone.jar`)
+2. Edit `docs/decide-host.service` and set the jar path under `ExecStart`.
+3. Copy `docs/decide-host.service` to `/etc/systemd/system/`
+4. Run `systemctl enable decide-host.service` and then `systemctl start decide-host.service`
 
-Copy `docs/decide-host.service` to `/etc/systemd/system/` and run ...
 
 ### Web proxy
 

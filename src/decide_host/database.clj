@@ -110,8 +110,9 @@
 ;; trials and events
 (defn- find-generic
   [db coll & [{:keys [match sort limit]
-               :or {sort (array-map :time 1)
+               :or {sort (array-map)
                     limit 0}}]]
+  #_(println "match:" match "\n sort:" sort "\n limit:" limit)
   (q/with-collection db coll
     (q/find match)
     (q/fields {:_id 0})
