@@ -54,3 +54,7 @@ List results may be filtered, sorted, and paginated using query parameters. Some
 Other parameters are more general. Parameters that begin with `sort-` will cause the returned results to be sorted by the field specified in the rest of the parameter name, and in the order indicated by the value of the parameter. For example, `sort-time=1` will return results sorted in order of time. The order of sorting operations may not be consistent with the order in the query URL.
 
 All other parameters not matching any given above shall be interpreted as filters that restrict results to records matching the key and value given. For example, `name=hopper` will only return records where the `name` field has the value `hopper`. If multiple parameters with the same key are specified, records that match any of the specified values will be returned.
+
+#### Query pitfalls
+
+In some cases, sorting the results on the server may result in a (silently) truncated dataset. This occurs because of a limitation in the underlying database (MongoDB) and its use of indices for queries. For the present, you can safely sort basic subject and event queries by time, but adding additional sorting operations may cause truncation.

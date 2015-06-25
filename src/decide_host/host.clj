@@ -190,11 +190,12 @@
                               :out zmq-out}})))
 
 (defn start! [context]
-  (when (get-in context [:host :addr])
+  (if (get-in context [:host :addr])
     (-> context
         (start-zmq-server)
         (start-heartbeat 2000)
-        (start-message-handler))))
+        (start-message-handler))
+    context))
 
 (defn stop! [context]
   (when-let [chan (get-in context [:host :in])]
