@@ -2,7 +2,7 @@
   "Functions for processing messages from controllers to host"
   (:require [decide-host.core :refer :all]
             [decide-host.database :as db]
-            [decide-host.notifications :refer [error-msg]]
+            [decide-host.notifications :refer [error-msg fatal-error]]
             [com.keminglabs.zmq-async.core :refer [register-socket!]]
             [clojure.core.async :as async :refer [>! <! >!! <!!]]
             [clojure.core.match :refer [match]]
@@ -154,12 +154,14 @@
         events (async/chan (async/sliding-buffer 64))
         ctx (assoc context :event-chan events)]
     (async/thread
-      (loop [[id & data] (<!! zout)]
-        (when-let [id (bytes-to-hex id)]
-          (when-let [result (apply process-message! ctx id data)]
-            #_(println "D: sending" id result)
-            (>!! zin (cons (hex-to-bytes id) result)))
-          (recur (<!! zout))))
+      (try
+        (loop [[id & data] (<!! zout)]
+          (when-let [id (bytes-to-hex id)]
+            (when-let [result (apply process-message! ctx id data)]
+              #_(println "D: sending" id result)
+              (>!! zin (cons (hex-to-bytes id) result)))
+            (recur (<!! zout))))
+        (catch Exception e (fatal-error context e)))
       (log "released socket")
       (async/close! events))
     (assoc-in context [:msg-handler :event-pub] (async/pub events :topic))))
@@ -169,12 +171,13 @@
   (let [{{zin :in} :host {db :db} :database} context
         ctrl-chan (async/chan)]
     (async/go
-      (loop []
-        (let [[x _] (async/alts! [ctrl-chan (async/timeout interval)])]
-          (when (not= x :stop)
-            (dorun (map #(check-connection! context %) (db/find-connected-controllers db)))
-            (recur))))
-      #_(println "D: heartbeat handler stopping"))
+      (try
+        (loop []
+          (let [[x _] (async/alts! [ctrl-chan (async/timeout interval)])]
+            (when (not= x :stop)
+              (dorun (map #(check-connection! context %) (db/find-connected-controllers db)))
+              (recur))))
+        (catch Exception e (fatal-error context e))))
     (assoc-in context [:heartbeat :ctrl] ctrl-chan)))
 
 (defn- start-zmq-server

@@ -10,6 +10,7 @@ ConditionPathExists=|/srv/decide-host
 WorkingDirectory=/srv/decide-host
 ExecStart=/usr/bin/java -jar /srv/decide-host/target/uberjar/decide-2.0.0-standalone.jar
 Restart=always
+RestartSec=10
 StandardOutput=syslog
 SyslogIdentifier=decide-host
 User=nobody
