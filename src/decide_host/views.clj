@@ -45,16 +45,19 @@
 (defn console
   [{:keys [controllers active-subjects inactive-subjects]}]
   (list
-   [:p "version: " (span-value version)]
-   [:p#time (server-time)]
-   [:div#controllers
-    [:p.ahead "Registered Controllers"]
-    [:ul#controller-list.item-list (controller-list controllers)]]
-   [:div#subjects
-    [:p.ahead "Active Subjects"]
-    [:ul#active-subject-list.item-list (subject-list active-subjects)]
-    [:p.ahead "Inactive Subjects"]
-    [:ul#inactive-subject-list.item-list (subject-list inactive-subjects)]]))
+   [:div.container
+    [:div.row
+     [:p "version: " (span-value version)]
+     [:p#time (server-time)]]
+    [:div.row
+     [:div#subjects.col-md-6
+      [:p.ahead "Active Subjects"]
+      [:ul#active-subject-list.item-list (subject-list active-subjects)]
+      [:p.ahead "Inactive Subjects"]
+      [:ul#inactive-subject-list.item-list (subject-list inactive-subjects)]]
+     [:div#controllers.col-md-6
+      [:p.ahead "Registered Controllers"]
+      [:ul#controller-list.item-list (controller-list controllers)]]]]))
 
 (defn index
   [data]
@@ -66,12 +69,13 @@
     [:meta {:content "black", :name "apple-mobile-web-app-status-bar-style"}]
     [:title "Decide Directory"]
     [:link {:rel "icon" :type "image/ico" :href "/static/images/favicon.ico"}]
-    (include-css "/static/css/jquery.mobile-1.3.1.min.css")
+    (include-css "/static/css/bootstrap.min.css")
+    (include-css "/static/css/bootstrap-theme.min.css")
     (include-css "/static/css/directory.css")
     (include-js "/static/js/jquery-2.1.4.min.js")
     (include-js "/static/js/interface.js")]
    [:body
-    [:div#page1 {:data-role "page"}
-     [:div {:data-role "header"}
+    [:div.container
+     [:div.row
       [:h3 "Decide Directory"]]
-     [:div#console (console data)]]]))
+     [:div#console.row (console data)]]]))

@@ -1,16 +1,3 @@
-#interface {
-    margin-left: auto;
-    margin-right: auto;
-}
-
-#page1 {
-    font-family: monospace;
-}
-
-#boxlist {
-    margin-top: 2%;
-}
-
 .hbar {
     font-family: monospace;
     background: black;
