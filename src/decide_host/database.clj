@@ -52,7 +52,10 @@
   ([db addr] (stop-subject! db addr (t/now)))
   ([db addr time] (mc/update db subj-coll
                           {:controller addr}
-                          {$set {:controller nil :procedure nil :stop-time time} })))
+                          {$set {:controller nil
+                                 :procedure nil
+                                 :experiment nil
+                                 :stop-time time} })))
 
 (defn update-subject!
   "Updates subject record in database"

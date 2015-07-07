@@ -120,7 +120,7 @@
   [db]
   (let [active-subjects (active-subjects-view db)]
     {:controllers (db/find-connected-controllers db)
-     :inactive-subjects (sort-by :_id (inactive-subjects-view db))
+     :inactive-subjects (sort-by (comp str :_id) (inactive-subjects-view db))
      :active-subjects (sort-by :controller (map #(agg/join-activity db %) active-subjects))}))
 
 (defn encode-for-ws
