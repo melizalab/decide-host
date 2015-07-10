@@ -42,6 +42,8 @@
   separated by '\r\n'"
   [handler]
   (fn [req]
+    ;; TODO check for poll parameter and instruct stream-response whether to
+    ;; close the channel
     (let [{:keys [headers body] :as response} (handler req)]
       (if (seq? body)
         (stream-response req response)
