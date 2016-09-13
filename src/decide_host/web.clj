@@ -29,7 +29,7 @@
                (content-type "application/json; charset=utf-8"))
            false)
     (doseq [rec body
-            :let [body* (str (json/encode rec {:pretty true}) "\r\n")]]
+            :let [body* (str (json/encode rec {:pretty false}) "\n")]]
       (send! chan body* false))
     (close chan))
   ;; stupidly, with-channel returns the channel, so we need to avoid passing
@@ -39,7 +39,7 @@
 
 (defn wrap-streaming-response
   "Middleware that will return seq responses as streams of JSON objects
-  separated by '\r\n'"
+  separated by '\n'"
   [handler]
   (fn [req]
     ;; TODO check for poll parameter and instruct stream-response whether to
