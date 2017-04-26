@@ -1,6 +1,6 @@
-(defproject decide "2.0.2-SNAPSHOT"
+(defproject decide "2.0.3"
   :description "operant control system"
-  :url "http://meliza.org/starboard"
+  :url "https://meliza.org/starboard"
   :license {:name "BSD" :url "http://www.opensource.org/licenses/BSD-3-Clause"}
 
   :min-lein-version "2.0.0"
