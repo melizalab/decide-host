@@ -53,8 +53,7 @@
      [:div#subjects.col-md-6
       [:p.ahead "Active Subjects"]
       [:ul#active-subject-list.item-list (subject-list active-subjects)]
-      [:p.ahead "Inactive Subjects"]
-      [:ul#inactive-subject-list.item-list (subject-list inactive-subjects)]]
+      [:a.ahead {:href "inactive" } "Inactive Subjects"]]
      [:div#controllers.col-md-6
       [:p.ahead "Registered Controllers"]
       [:ul#controller-list.item-list (controller-list controllers)]]]]))

@@ -61,7 +61,7 @@ For debugging and testing purposes, running `lein frodo` in a virtual terminal w
 
 ### Web proxy
 
-For deployment, `decide-host` should be run behind a dedicated web server. This configuration is necessary to restrict access to authenticated users (and to encrypt the authentication protocol so passwords aren't sent in the clear).  The web server can also acts as a proxy for individual controllers running on a private network.
+For deployment, `decide-host` should be run behind a dedicated web server. This configuration is necessary to restrict access to authenticated users (and to encrypt the authentication protocol so passwords aren't sent in the clear).  The web server can also act as a proxy for individual controllers running on a private network.
 
 This section details instructions for using [nginx](http://nginx.org/) as the web server. Apache may also work, but does not support proxy operations for websockets as well as nginx at this date.
 
