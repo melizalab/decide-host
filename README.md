@@ -1,6 +1,6 @@
 # decide-host
 
-This project has been replaced by [django-decide-host](/melizalab/django-decide-host) and is no longer under activate development.
+This project has been replaced by [django-decide-host](/melizalab/django-decide-host) and is no longer under active development.
 
 Decide is an event-driven state-machine framework for running behavioral experiments with embeddable computers like the Beaglebone Black. This repository contains code for `decide-host`, a process that collates data from multiple devices running `decide`. Among other functions, it tracks what subjects are running experiments on what controller, notifies responsible parties when controllers disconnect unexpectedly, and provides an HTTP API for access to trial data and a simple web page that summarizes the current state of the system.
 
